@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,43 +26,26 @@
 package de.gematik.zeta.zetaguard.keycloak.it
 
 import de.gematik.zeta.zetaguard.keycloak.commons.CLIENT_B_SCOPE
-import de.gematik.zeta.zetaguard.keycloak.commons.CLIENT_C_ID
-import de.gematik.zeta.zetaguard.keycloak.commons.EncodingUtil.toObject
 import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
-import de.gematik.zeta.zetaguard.keycloak.commons.PKIUtil.generateECKeys
-import de.gematik.zeta.zetaguard.keycloak.commons.TELEMATIK_ID
 import de.gematik.zeta.zetaguard.keycloak.commons.TELEMATIK_ID2
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.ZetaGuardClientInstanceData
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.ZetaProductPlatform
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_ACCESS_TOKEN_CLIENT_DATA
-import de.gematik.zeta.zetaguard.keycloak.commons.server.KeycloakError
+import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
-import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_REALM
-import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
-import de.gematik.zeta.zetaguard.keycloak.commons.toAccessToken
-import de.gematik.zeta.zetaguard.keycloak.commons.toRefreshToken
+import de.gematik.zeta.zetaguard.keycloak.commons.server.toBase64
 import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.leafCertificate
 import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.Order
-import io.kotest.core.spec.style.FunSpec
-import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.apache.http.HttpStatus.SC_BAD_REQUEST
-import org.keycloak.OAuth2Constants.CLIENT_ASSERTION_TYPE_JWT
 import org.keycloak.OAuthErrorException.INVALID_CLIENT
 import org.keycloak.OAuthErrorException.INVALID_REQUEST
+import org.keycloak.common.util.SecretGenerator
 import org.keycloak.events.Errors.INVALID_TOKEN
-import org.keycloak.representations.AccessTokenResponse
-import org.keycloak.util.JWKSUtils
-import org.keycloak.util.TokenUtil.TOKEN_TYPE_BEARER
-import org.keycloak.util.TokenUtil.TOKEN_TYPE_DPOP
 
 @Order(1)
-class ExternalTokenExchangeIT : FunSpec() {
+class ExternalTokenExchangeIT : ZetaGuardFunSpec() {
   val keycloakWebClient = KeycloakWebClient()
   val baseUri = keycloakWebClient.uriBuilder().build().toString()
   val realmUrl = keycloakWebClient.uriBuilder().realmUrl().toString()
@@ -72,7 +55,7 @@ class ExternalTokenExchangeIT : FunSpec() {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
       // The zeta-client client knows about the JWT public key without client registration, because the key certificate is configured
       // hard coded in the "jwt.credential.certificate" attribute (See zeta-client.json)
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
       val smcbToken = createSMCBToken(nonce)
 
       keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt)
@@ -80,7 +63,7 @@ class ExternalTokenExchangeIT : FunSpec() {
 
     test("Fail, if token is reused") {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
       val smcbToken = createSMCBToken(nonce)
 
       keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt)
@@ -94,14 +77,14 @@ class ExternalTokenExchangeIT : FunSpec() {
 
     test("Telematik ID mismatch") {
       val nonce2 = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val jwt2 = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jwt2 = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce2)
       val smcbToken2 =
-          smcbTokenGenerator.generateSMCBToken(
-              subject = TELEMATIK_ID2,
-              nonceString = nonce2,
-              audiences = listOf(baseUri),
-              certificateChain = listOf(leafCertificate),
-          )
+        smcbTokenGenerator.generateSMCBToken(
+          subject = TELEMATIK_ID2,
+          nonceString = nonce2,
+          audiences = listOf(baseUri),
+          certificateChain = listOf(leafCertificate),
+        )
 
       keycloakWebClient.testExchangeToken(smcbToken2, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt2) {
         it.error shouldBe INVALID_TOKEN
@@ -112,7 +95,7 @@ class ExternalTokenExchangeIT : FunSpec() {
 
     test("External token exchange fails without DPoP token") {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val jws = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jws = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
       val smcbToken = createSMCBToken(nonce)
 
       keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jws, useDPoP = false) {
@@ -128,6 +111,7 @@ class ExternalTokenExchangeIT : FunSpec() {
 
       keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = null) {
         it.error shouldBe INVALID_CLIENT
+        // AbstractJWTClientValidator#validateClientAssertionParameters
         it.errorDescription shouldBe "Parameter client_assertion_type is missing"
         it.statusCode shouldBe SC_BAD_REQUEST
       }
@@ -135,9 +119,9 @@ class ExternalTokenExchangeIT : FunSpec() {
 
     test("External token exchange fails with invalid audience") {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val jws = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jws = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
       val smcbToken =
-          smcbTokenGenerator.generateSMCBToken(nonceString = nonce, audiences = listOf(ZETA_CLIENT), certificateChain = listOf(leafCertificate))
+        smcbTokenGenerator.generateSMCBToken(nonceString = nonce, audiences = listOf(ZETA_CLIENT), certificateChain = listOf(leafCertificate))
 
       keycloakWebClient.testExchangeToken(smcbToken, clientAssertion = jws, requestedClientScope = CLIENT_B_SCOPE) {
         it.error shouldBe INVALID_TOKEN
@@ -148,7 +132,7 @@ class ExternalTokenExchangeIT : FunSpec() {
 
     test("SMC-B token fails without valid nonce") {
       val smcbToken = smcbTokenGenerator.generateSMCBToken(audiences = listOf(baseUri), certificateChain = listOf(leafCertificate))
-      val jws = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jws = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), SecretGenerator.getInstance().randomBytes(16).toBase64())
 
       keycloakWebClient.testExchangeToken(smcbToken, clientAssertion = jws) {
         it.error shouldBe INVALID_TOKEN
@@ -160,8 +144,8 @@ class ExternalTokenExchangeIT : FunSpec() {
     test("Nonce is not reusable") {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
       val smcbToken = createSMCBToken(nonce)
-      val jws1 = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
-      val jws2 = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jws1 = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+      val jws2 = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
 
       keycloakWebClient.testExchangeToken(smcbToken, clientAssertion = jws1, requestedClientScope = CLIENT_B_SCOPE)
       keycloakWebClient.testExchangeToken(smcbToken, clientAssertion = jws2) {
@@ -173,76 +157,5 @@ class ExternalTokenExchangeIT : FunSpec() {
   }
 
   private fun createSMCBToken(nonce: String): String =
-      smcbTokenGenerator.generateSMCBToken(nonceString = nonce, audiences = listOf(baseUri), certificateChain = listOf(leafCertificate))
-
-  companion object {
-    init {
-      setupBouncyCastle()
-    }
-  }
-}
-
-typealias ErrorHandler = (KeycloakError) -> Unit
-
-fun KeycloakWebClient.testExchangeToken(
-    subjectToken: String,
-    clientId: String = ZETA_CLIENT,
-    clientAssertion: String?,
-    requestedClientScope: String? = null,
-    useDPoP: Boolean = true,
-    audience: String? = null,
-    expectedError: ErrorHandler? = null,
-): AccessTokenResponse {
-  val keys = generateECKeys()
-  val dPoPToken = if (useDPoP) smcbTokenGenerator.generateDPoPToken(keys, endpointURL = uriBuilder().tokenUrl(), accessToken = subjectToken) else null
-
-  val either =
-      tokenExchange(
-          clientId = clientId,
-          subjectToken = subjectToken,
-          requestedClientScope = requestedClientScope,
-          clientAssertionType = CLIENT_ASSERTION_TYPE_JWT,
-          clientAssertion = clientAssertion,
-          dPoPToken = dPoPToken,
-          audience = audience,
-      )
-
-  if (expectedError != null) {
-    either.isLeft() shouldBe true
-    either.onLeft { expectedError(it) }
-
-    return AccessTokenResponse()
-  } else {
-    val newAccessTokenResponse = either.shouldBeRight().reponseObject
-    val newAccessToken = newAccessTokenResponse.token.toAccessToken()
-    val newRefreshToken = newAccessTokenResponse.refreshToken.toRefreshToken()
-
-    if (useDPoP) {
-      newAccessTokenResponse.tokenType shouldBe TOKEN_TYPE_DPOP
-      val thumbprint = JWKSUtils.computeThumbprint(keys.jwk)
-      newAccessToken.confirmation.keyThumbprint shouldBe thumbprint
-    } else {
-      newAccessTokenResponse.tokenType shouldBe TOKEN_TYPE_BEARER
-    }
-
-    newAccessToken.issuer shouldContain ZETA_REALM
-    newAccessToken.issuedFor shouldBe clientId
-
-    newAccessToken.subject shouldBe TELEMATIK_ID
-    @Suppress("UNCHECKED_CAST") // https://ey-fp-dev.atlassian.net/browse/ZETAP-774
-    val clientDataMap = newAccessToken.otherClaims[CLAIM_ACCESS_TOKEN_CLIENT_DATA].shouldNotBeNull() as Map<String, Any>
-
-    val (_, clientId1, _, _, _, _, platformProductId) = clientDataMap.toObject<ZetaGuardClientInstanceData>()
-
-    clientId1 shouldBe clientId
-    platformProductId.productPlatform shouldBe ZetaProductPlatform.LINUX
-
-    if (requestedClientScope == CLIENT_B_SCOPE) {
-      newAccessToken.audience shouldContain CLIENT_C_ID
-    }
-
-    newRefreshToken.subject shouldBe TELEMATIK_ID
-
-    return newAccessTokenResponse
-  }
+    smcbTokenGenerator.generateSMCBToken(nonceString = nonce, audiences = listOf(baseUri), certificateChain = listOf(leafCertificate))
 }

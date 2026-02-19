@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,9 @@ import org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy
  * For details, see https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#5.5.2.4
  */
 class ZetaGuardClientRegistrationPolicy() : ClientRegistrationPolicy {
-  override fun beforeRegister(context: ClientRegistrationContext) {}
+  override fun beforeRegister(context: ClientRegistrationContext) {
+    // No-op
+  }
 
   override fun afterRegister(context: ClientRegistrationContext, clientModel: ClientModel) {
     clientModel.setAttribute(ATTRIBUTE_ATTESTATION_STATE, ATTESTATION_STATE_PENDING)
@@ -53,22 +55,22 @@ class ZetaGuardClientRegistrationPolicy() : ClientRegistrationPolicy {
   }
 
   override fun beforeUpdate(context: ClientRegistrationContext, clientModel: ClientModel) {
-    // not implemented
+    // No-op
   }
 
   override fun afterUpdate(context: ClientRegistrationContext, clientModel: ClientModel) {
-    // not implemented
+    // No-op
   }
 
   override fun beforeDelete(provider: ClientRegistrationProvider, clientModel: ClientModel) {
-    // not implemented
+    // No-op
   }
 
   override fun beforeView(provider: ClientRegistrationProvider, clientModel: ClientModel) {
-    // not implemented
+    // No-op
   }
 
   override fun close() {
-    // not implemented
+    // No-op
   }
 }

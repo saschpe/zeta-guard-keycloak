@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,11 +42,17 @@ import org.keycloak.wellknown.WellKnownProviderFactory
 class ZetaGuardWellKnownProviderFactory : WellKnownProviderFactory {
   override fun create(session: KeycloakSession) = ZetaGuardWellKnownProvider(session)
 
-  override fun init(config: Config.Scope) {}
+  override fun init(config: Config.Scope) {
+    // No-op
+  }
 
-  override fun postInit(factory: KeycloakSessionFactory) {}
+  override fun postInit(factory: KeycloakSessionFactory) {
+    // No-op
+  }
 
-  override fun close() {}
+  override fun close() {
+    // No-op
+  }
 
   override fun getId() = WELLKNOWN_PROVIDER_ID
 
@@ -63,13 +69,13 @@ class ZetaGuardWellKnownProviderFactory : WellKnownProviderFactory {
     internal val DEFAULT_URI = URI("https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/gemSpec_ZETA_V1.1.0/")
 
     internal fun serviceDocumentationUri(getEnv: () -> String? = defaultgetenv): URI =
-        if (this::serviceUri.isInitialized) {
-          serviceUri
-        } else {
-          getEnv()
-              .toURI()
-              .mapLeft { log.warn("Environment variable »$ENV_SERVICE_DOCUMENTATION_URI« contains no valid URI: ${it.message}") }
-              .fold(ifLeft = { DEFAULT_URI }, ifRight = { it })
-        }
+      if (this::serviceUri.isInitialized) {
+        serviceUri
+      } else {
+        getEnv()
+          .toURI()
+          .mapLeft { log.warn("Environment variable »$ENV_SERVICE_DOCUMENTATION_URI« contains no valid URI: ${it.message}") }
+          .fold(ifLeft = { DEFAULT_URI }, ifRight = { it })
+      }
   }
 }

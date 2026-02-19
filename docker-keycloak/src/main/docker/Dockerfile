@@ -11,10 +11,14 @@ COPY maven/providers/*.jar providers/
 
 RUN /opt/keycloak/bin/kc.sh build
 
+# Keycloak runtime
 FROM ${docker.keycloak.image}:${keycloak.version}
-COPY --from=builder /opt/keycloak/ /opt/keycloak/
+COPY --from=builder --chown=1000:1000 /opt/keycloak/ /opt/keycloak/
 
 USER root
+RUN chown -R 1000:1000 /opt/keycloak \
+    && chmod -R g=u /opt/keycloak
+
 ENV TZ=Europe/Berlin
 
 # Set correct time zone

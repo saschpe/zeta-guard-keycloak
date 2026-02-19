@@ -8,17 +8,11 @@
     <parent>
         <groupId>de.gematik.zeta.zeta-guard</groupId>
         <artifactId>keycloak-zeta</artifactId>
-        <version>0.2.4</version>
+        <version>0.3.2</version>
     </parent>
 
     <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>commons-client</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
+       <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>commons-server</artifactId>
             <version>${project.version}</version>
@@ -35,16 +29,48 @@
             <artifactId>smc-b-token-exchange</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>nonce-management</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>access-token-mapper</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>client-registration</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>well-known-provider</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>integration-tests</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <profiles>
         <profile>
             <id>coverage</id>
+
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
+
                         <executions>
                             <execution>
                                 <id>report-aggregate</id>

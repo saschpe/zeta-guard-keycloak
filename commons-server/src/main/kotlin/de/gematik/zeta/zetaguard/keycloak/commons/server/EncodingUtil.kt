@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ package de.gematik.zeta.zetaguard.keycloak.commons.server
 import arrow.core.Either
 import arrow.core.left
 import java.net.URI
+import java.security.MessageDigest
+import java.security.PublicKey
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.time.Duration
@@ -35,17 +37,20 @@ import java.time.temporal.ChronoUnit
 import kotlin.io.encoding.Base64
 import org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
 import org.keycloak.common.util.Base64Url
+import org.keycloak.common.util.PemUtils
+
+const val DIGEST_ALGORITHM = "SHA-256"
 
 fun ByteArray.toBase64(): String = Base64Url.encode(this)
 
 fun String.fromBase64(): ByteArray = Base64Url.decode(this)
 
 fun String?.toURI(): Either<Throwable, URI> =
-    if (this != null) {
-      Either.catch { URI(this) }
-    } else {
-      NullPointerException().left()
-    }
+  if (this != null) {
+    Either.catch { URI(this) }
+  } else {
+    NullPointerException().left()
+  }
 
 fun String.toCertificate(): X509Certificate {
   val certificateFactory = CertificateFactory.getInstance("X.509", PROVIDER_NAME)
@@ -54,10 +59,16 @@ fun String.toCertificate(): X509Certificate {
   return certificateFactory.generateCertificate(bytes.inputStream()) as X509Certificate
 }
 
+fun String.toPublicKey(): PublicKey = PemUtils.decodePublicKey(this)
+
 fun LocalDateTime.toISO8601(): String = format(DateTimeFormatter.ISO_DATE_TIME)
 
 fun String.toLocalDateTime(): LocalDateTime = LocalDateTime.parse(this, DateTimeFormatter.ISO_DATE_TIME)
 
 fun String.toDuration(): Duration = Duration.parse(this)
 
-fun currentTime() = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
+fun currentTime(): LocalDateTime = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
+
+fun toHash(vararg bytes: ByteArray): ByteArray = MessageDigest.getInstance(DIGEST_ALGORITHM).apply { bytes.forEach { update(it) } }.digest()
+
+fun ByteArray.toHash() = toHash(this)

@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,17 @@ import arrow.core.raise.either
 import arrow.core.raise.ensure
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.AdminEventLoggerProvider.Companion.calculateHash
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService
-import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_PREVIOUS_HASH
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_MARKER
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_HASH
 
-/** Service for verifying the integrity of the admin event log chain. */
+/**
+ * Service for verifying the integrity of the admin event log chain.
+ *
+ * https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_26269
+ *
+ * The chain is verified by checking that each log entry's previous hash matches the current hash of the previous entry. The very first hash value is
+ * not stored in the data base but kept in memory.
+ */
 class AdminEventLogVerificationService(private val adminEventLogService: AdminEventLogStorageService) {
   /**
    * Verifies the integrity of the admin event log chain.
@@ -49,11 +57,14 @@ class AdminEventLogVerificationService(private val adminEventLogService: AdminEv
       return@either AdminEventLogEmpty
     }
 
-    var previousHash = GENESIS_PREVIOUS_HASH
+    var previousHash = GENESIS_HASH
 
     for (log in logs) {
-      ensure(log.previousHash == previousHash) {
-        InvalidPreviousHash("Invalid previous hash@${log.id}: expected $previousHash but found ${log.previousHash}")
+      // Replace with in-memory hash
+      val logpreviousHash = if (log.previousHash == GENESIS_MARKER) GENESIS_HASH else log.previousHash
+
+      ensure(logpreviousHash == previousHash) {
+        InvalidPreviousHash("Invalid previous hash@${log.id}: expected $previousHash but found $logpreviousHash")
       }
 
       val calculatedHash = calculateHash(log.event, log.createdAt, previousHash)

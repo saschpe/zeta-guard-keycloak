@@ -5,7 +5,7 @@
     <parent>
         <groupId>de.gematik.zeta.zeta-guard</groupId>
         <artifactId>keycloak-zeta</artifactId>
-        <version>0.2.4</version>
+        <version>0.3.2</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -72,4 +72,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+
+                <configuration>
+                    <environmentVariables>
+                        <GENESIS_HASH>4841c2142fef441daa6ee6c57db65c011935964b14e94a6c8f5ec0447b83526c</GENESIS_HASH>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

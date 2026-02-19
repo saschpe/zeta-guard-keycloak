@@ -25,6 +25,10 @@
   "frontchannelLogout": true,
   "protocol": "openid-connect",
   "attributes": {
+    "use.jwks.string": "true",
+    "jwks.string": "{\"keys\":[{\"kid\":\"3c9d8y3D2uENHN_loz9JMbJmgIQ_gYfnG7gJruCkv7E\",\"kty\":\"EC\",\"use\":\"sig\",\"crv\":\"P-256\",\"x\":\"ZM0dBiNgCuDhbtEjfpAKwW9nWykTwz4t01wbT8kt7qo\",\"y\":\"e54Ysa5vYKWTqbAyyJV_IE-h39EvDcYW9GxQt7X5C1Q\"}]}",
+    "jwt.credential.kid": "3c9d8y3D2uENHN_loz9JMbJmgIQ_gYfnG7gJruCkv7E",
+    "jwt.credential.public.key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZM0dBiNgCuDhbtEjfpAKwW9nWykTwz4t01wbT8kt7qp7nhixrm9gpZOpsDLIlX8gT6Hf0S8Nxhb0bFC3tfkLVA==",
     "realm_client": "false",
     "oidc.ciba.grant.enabled": "false",
     "backchannel.logout.session.required": "true",

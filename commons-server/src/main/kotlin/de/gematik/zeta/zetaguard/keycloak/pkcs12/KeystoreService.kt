@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import org.keycloak.common.util.KeystoreUtil.KeystoreFormat.PKCS12
 class KeystoreService(stream: InputStream, password: String) {
   private val keystore: KeyStore by lazy {
     KeyStore.getInstance(PKCS12.name, PROVIDER_NAME) // Always use BC in order to handle Brainpool curve
-        .apply { load(stream, password.toCharArray()) }
+      .apply { load(stream, password.toCharArray()) }
   }
   private val aliases: List<String> by lazy { keystore.aliases().toList().map { it.uppercase() } }
 
@@ -44,9 +44,7 @@ class KeystoreService(stream: InputStream, password: String) {
   fun getCertificate(name: String): X509Certificate {
     val certificate = keystore.getCertificate(name.uppercase()) ?: keystore.getCertificate(name)
 
-    if (certificate == null) {
-      throw IllegalArgumentException("Certificate »$name« not found.")
-    }
+    requireNotNull(certificate) { "Certificate »$name« not found." }
 
     return certificate as X509Certificate
   }
@@ -54,9 +52,7 @@ class KeystoreService(stream: InputStream, password: String) {
   fun getPrivateKey(name: String, password: String): PrivateKey {
     val key = keystore.getKey(name.uppercase(), password.toCharArray()) ?: keystore.getCertificate(name)
 
-    if (key == null) {
-      throw IllegalArgumentException("Key »$name« not found.")
-    }
+    requireNotNull(key) { "Key »$name« not found." }
 
     return key as PrivateKey
   }

@@ -5,7 +5,7 @@
     <parent>
         <groupId>de.gematik.zeta.zeta-guard</groupId>
         <artifactId>keycloak-zeta</artifactId>
-        <version>0.2.4</version>
+        <version>0.3.2</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -14,7 +14,7 @@
     <description>Create pre-configured Keycloak image</description>
 
     <properties>
-        <docker.keycloak.image>quay.io/keycloak/keycloak</docker.keycloak.image>
+        <docker.keycloak.image>zeta/devops/keycloak</docker.keycloak.image>
         <docker.name>zeta/zeta-guard/keycloak-zeta</docker.name>
         <docker.tag>latest</docker.tag>
         <docker.repo/>
@@ -120,6 +120,12 @@
                                     <groupId>${project.groupId}</groupId>
                                     <artifactId>commons-server</artifactId>
                                     <destFileName>commons-server.jar</destFileName>
+                                </artifactItem>
+
+                                <artifactItem>
+                                    <groupId>${project.groupId}</groupId>
+                                    <artifactId>client-assertion</artifactId>
+                                    <destFileName>client-assertion.jar</destFileName>
                                 </artifactItem>
 
                                 <artifactItem>

@@ -1,8 +1,8 @@
 /*-
  * #%L
- * referencevalidator-cli
+ * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,13 +25,12 @@ package de.gematik.zeta.zetaguard.keycloak.it
 
 import de.gematik.zeta.zetaguard.keycloak.commons.CLIENT_B_SCOPE
 import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
+import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
-import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
 import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.Order
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import java.net.URI
 import java.net.http.HttpClient
@@ -43,7 +42,7 @@ import org.apache.http.entity.ContentType.APPLICATION_JSON
 private const val POLICY_DENIED = "policy_denied"
 
 @Order(2)
-class OpaEnforcementIT : FunSpec() {
+class OpaEnforcementIT : ZetaGuardFunSpec() {
   private val keycloak = KeycloakWebClient()
   private val realmUrl = keycloak.uriBuilder().realmUrl().toString()
 
@@ -53,13 +52,13 @@ class OpaEnforcementIT : FunSpec() {
   init {
     test("OPA allow: permitted scope and audience") {
       val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
       val smcb =
-          smcbTokenGenerator.generateSMCBToken(
-              nonceString = nonce,
-              audiences = listOf(keycloak.uriBuilder().build().toString()),
-              certificateChain = listOf(SMCBTokenHelper.leafCertificate),
-          )
+        smcbTokenGenerator.generateSMCBToken(
+          nonceString = nonce,
+          audiences = listOf(keycloak.uriBuilder().build().toString()),
+          certificateChain = listOf(SMCBTokenHelper.leafCertificate),
+        )
 
       keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true)
     }
@@ -67,13 +66,13 @@ class OpaEnforcementIT : FunSpec() {
     test("OPA deny: scopes not allowed") {
       withOpaValue("/v1/data/token/allowed_scopes", "[\"only-other-scope\"]") {
         val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
         val smcb =
-            smcbTokenGenerator.generateSMCBToken(
-                nonceString = nonce,
-                audiences = listOf(keycloak.uriBuilder().build().toString()),
-                certificateChain = listOf(SMCBTokenHelper.leafCertificate),
-            )
+          smcbTokenGenerator.generateSMCBToken(
+            nonceString = nonce,
+            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            certificateChain = listOf(SMCBTokenHelper.leafCertificate),
+          )
 
         keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
           it.statusCode shouldBe 403
@@ -86,13 +85,13 @@ class OpaEnforcementIT : FunSpec() {
     test("OPA deny: audience not allowed") {
       withOpaValue("/v1/data/audiences/allowed_audiences", "[\"https://example.com/only\"]") {
         val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
         val smcb =
-            smcbTokenGenerator.generateSMCBToken(
-                nonceString = nonce,
-                audiences = listOf(keycloak.uriBuilder().build().toString()),
-                certificateChain = listOf(SMCBTokenHelper.leafCertificate),
-            )
+          smcbTokenGenerator.generateSMCBToken(
+            nonceString = nonce,
+            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            certificateChain = listOf(SMCBTokenHelper.leafCertificate),
+          )
 
         keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
           it.statusCode shouldBe 403
@@ -105,13 +104,13 @@ class OpaEnforcementIT : FunSpec() {
     test("OPA deny: profession not allowed") {
       withOpaValue("/v1/data/professions/allowed_professions", "[]") {
         val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
         val smcb =
-            smcbTokenGenerator.generateSMCBToken(
-                nonceString = nonce,
-                audiences = listOf(keycloak.uriBuilder().build().toString()),
-                certificateChain = listOf(SMCBTokenHelper.leafCertificate),
-            )
+          smcbTokenGenerator.generateSMCBToken(
+            nonceString = nonce,
+            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            certificateChain = listOf(SMCBTokenHelper.leafCertificate),
+          )
 
         keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
           it.statusCode shouldBe 403
@@ -124,13 +123,13 @@ class OpaEnforcementIT : FunSpec() {
     test("OPA deny: product posture not allowed") {
       withOpaValue("/v1/data/products/allowed_products", "{}") {
         val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
         val smcb =
-            smcbTokenGenerator.generateSMCBToken(
-                nonceString = nonce,
-                audiences = listOf(keycloak.uriBuilder().build().toString()),
-                certificateChain = listOf(SMCBTokenHelper.leafCertificate),
-            )
+          smcbTokenGenerator.generateSMCBToken(
+            nonceString = nonce,
+            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            certificateChain = listOf(SMCBTokenHelper.leafCertificate),
+          )
 
         keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
           it.statusCode shouldBe 403
@@ -144,13 +143,13 @@ class OpaEnforcementIT : FunSpec() {
       // Allow only the SMCB profession OID used in the test certificate
       withOpaValue("/v1/data/professions/allowed_professions", "[\"1.2.276.0.76.4.50\"]") {
         val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
         val smcb =
-            smcbTokenGenerator.generateSMCBToken(
-                nonceString = nonce,
-                audiences = listOf(keycloak.uriBuilder().build().toString()),
-                certificateChain = listOf(SMCBTokenHelper.leafCertificate),
-            )
+          smcbTokenGenerator.generateSMCBToken(
+            nonceString = nonce,
+            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            certificateChain = listOf(SMCBTokenHelper.leafCertificate),
+          )
 
         keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true)
       }
@@ -160,13 +159,13 @@ class OpaEnforcementIT : FunSpec() {
       // Set an allowed profession OID that does not match the certificate's profession OID
       withOpaValue("/v1/data/professions/allowed_professions", "[\"1.2.276.0.76.4.51\"]") {
         val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl))
+        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
         val smcb =
-            smcbTokenGenerator.generateSMCBToken(
-                nonceString = nonce,
-                audiences = listOf(keycloak.uriBuilder().build().toString()),
-                certificateChain = listOf(SMCBTokenHelper.leafCertificate),
-            )
+          smcbTokenGenerator.generateSMCBToken(
+            nonceString = nonce,
+            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            certificateChain = listOf(SMCBTokenHelper.leafCertificate),
+          )
 
         keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
           it.statusCode shouldBe 403
@@ -178,14 +177,14 @@ class OpaEnforcementIT : FunSpec() {
   }
 
   private fun get(path: String): String =
-      http.send(HttpRequest.newBuilder(URI.create("$opaBase$path")).GET().build(), HttpResponse.BodyHandlers.ofString()).body()
+    http.send(HttpRequest.newBuilder(URI.create("$opaBase$path")).GET().build(), HttpResponse.BodyHandlers.ofString()).body()
 
   private fun putValue(path: String, jsonValue: String) {
     val req =
-        HttpRequest.newBuilder(URI.create("$opaBase$path"))
-            .header(CONTENT_TYPE, APPLICATION_JSON.mimeType)
-            .PUT(HttpRequest.BodyPublishers.ofString(jsonValue))
-            .build()
+      HttpRequest.newBuilder(URI.create("$opaBase$path"))
+        .header(CONTENT_TYPE, APPLICATION_JSON.mimeType)
+        .PUT(HttpRequest.BodyPublishers.ofString(jsonValue))
+        .build()
     val res = http.send(req, HttpResponse.BodyHandlers.ofString())
     require(res.statusCode() in 200..299) { "OPA PUT $path failed: ${res.statusCode()} body=${res.body()}" }
   }
@@ -209,12 +208,6 @@ class OpaEnforcementIT : FunSpec() {
       return block()
     } finally {
       restore(path, snap)
-    }
-  }
-
-  companion object {
-    init {
-      setupBouncyCastle()
     }
   }
 }

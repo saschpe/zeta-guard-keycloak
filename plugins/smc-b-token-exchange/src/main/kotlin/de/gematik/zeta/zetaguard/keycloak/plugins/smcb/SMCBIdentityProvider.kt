@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,7 +102,8 @@ open class SMCBIdentityProvider(session: KeycloakSession, config: OIDCIdentityPr
   /**
    * Remember and count the clients of an SMC-B User (identified by Telematik-ID).
    *
-   * Set user-associated data as described in https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_26972
+   * Set user-associated data as described in https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_26972,
+   * https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_25650
    *
    * The maximum number of clients per user is limited: https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_25748
    */

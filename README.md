@@ -79,7 +79,7 @@ Reports can be accessed using links in the individual pipeline logs.
 
 ## License
 
-(C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+(C) tech@Spree GmbH, 2026, licensed for gematik GmbH
 
 Apache License, Version 2.0
 

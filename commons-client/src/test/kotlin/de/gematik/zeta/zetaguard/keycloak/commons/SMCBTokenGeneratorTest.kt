@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,12 +30,12 @@ import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
 import de.gematik.zeta.zetaguard.keycloak.commons.server.admission
 import de.gematik.zeta.zetaguard.keycloak.commons.server.betriebsstaetteArzt
+import de.gematik.zeta.zetaguard.keycloak.commons.server.createVerifierContext
 import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
 import de.gematik.zeta.zetaguard.keycloak.commons.server.toCertificate
 import de.gematik.zeta.zetaguard.keycloak.commons.server.toPEM
 import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreServiceTest
 import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreServiceTest.Companion.getPrivateKey
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainOnly
 import io.kotest.matchers.longs.shouldBeGreaterThan
@@ -58,15 +58,22 @@ import org.keycloak.OAuth2Constants
 import org.keycloak.jose.jws.JWSHeader
 import org.keycloak.representations.IDToken
 
-class SMCBTokenGeneratorTest : FunSpec() {
+class SMCBTokenGeneratorTest : ZetaGuardFunSpec() {
   init {
     val objectUnderTest = SMCBTokenGenerator()
     val token = objectUnderTest.generateSMCBToken()
-    val (jwt, header) = token.toIDTokenInfo(objectUnderTest.subjectKeyPair.createVerifierContext())
+    val (jwt, header) = token.toIDTokenInfo(objectUnderTest.subjectKeyPair.public.createVerifierContext())
 
     test("Validate JWT") {
       val pem = objectUnderTest.certificate.toPEM()
-      pem shouldContain "\nMII"
+      pem shouldContain "-----BEGIN CERTIFICATE-----\nMII"
+
+      checkJWT(header, jwt)
+    }
+
+    test("Write publicy key pem") {
+      val pem = objectUnderTest.subjectKeyPair.public.toPEM()
+      pem shouldContain "-----BEGIN PUBLIC KEY-----\nMFk"
 
       checkJWT(header, jwt)
     }
@@ -97,7 +104,7 @@ class SMCBTokenGeneratorTest : FunSpec() {
       val subjectKeyPair = KeyPair(publicKey, privateKey)
       val smcbTokenGenerator = SMCBTokenGenerator(subjectKeyPair = subjectKeyPair)
       val token = smcbTokenGenerator.generateSMCBToken(certificateChain = listOf(leafCertificate))
-      val (jwt, header) = token.toIDTokenInfo(subjectKeyPair.createVerifierContext())
+      val (jwt, header) = token.toIDTokenInfo(subjectKeyPair.public.createVerifierContext())
 
       checkJWT(header, jwt)
       checkCertificateExtensions(leafCertificate, TELEMATIK_ID)

@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage
 
-import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_PREVIOUS_HASH
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -45,6 +44,7 @@ import org.apache.commons.lang3.builder.ToStringStyle.NO_FIELD_NAMES_STYLE
  * @property previousHash The hash of the previous log entry, used for integrity verification.
  * @property currentHash The hash of the current log entry, calculated from the event data and timestamp.
  */
+@Suppress("JpaDataSourceORMInspection")
 @Entity
 @Table(name = "admin_event_log")
 class AdminEventLog(
@@ -55,7 +55,7 @@ class AdminEventLog(
     @Column(name = "current_hash", nullable = false, length = 64, unique = true) val currentHash: String,
 ) {
   // JPA requires a no-arg constructor for entity classes
-  @Suppress("unused") private constructor() : this(null, Instant.now(), "", GENESIS_PREVIOUS_HASH, GENESIS_PREVIOUS_HASH)
+  @Suppress("unused") constructor() : this(null, Instant.now(), "", "", "")
 
   override fun equals(other: Any?): Boolean =
       when {

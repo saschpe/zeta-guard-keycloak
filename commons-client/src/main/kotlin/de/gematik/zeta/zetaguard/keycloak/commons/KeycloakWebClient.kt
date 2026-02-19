@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import arrow.core.left
 import arrow.core.merge
 import arrow.core.right
 import com.fasterxml.jackson.databind.ObjectMapper
-import de.gematik.zeta.zetaguard.keycloak.commons.EncodingUtil.toJSON
+import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.toJSON
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTESTATION_STATE_VALID
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_ATTESTATION_STATE
 import de.gematik.zeta.zetaguard.keycloak.commons.server.KeycloakError
@@ -58,7 +58,6 @@ import org.apache.http.entity.StringEntity
 import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.ssl.SSLContextBuilder
-import org.keycloak.OAuth2Constants.ACCESS_TOKEN_TYPE
 import org.keycloak.OAuth2Constants.AUDIENCE
 import org.keycloak.OAuth2Constants.CLIENT_ASSERTION
 import org.keycloak.OAuth2Constants.CLIENT_ASSERTION_TYPE
@@ -120,20 +119,20 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
    * @return A [KeycloakResponse] containing an [AccessTokenResponse].
    */
   fun login(
-      realm: String = ZETA_REALM,
-      user: String = USER1,
-      password: String = USER1_PASSWORD,
-      client: String,
-      clientSecret: String? = null,
-      requestedClientScope: String? = null,
+    realm: String = ZETA_REALM,
+    user: String = USER1,
+    password: String = USER1_PASSWORD,
+    client: String,
+    clientSecret: String? = null,
+    requestedClientScope: String? = null,
   ): KeycloakResponse<AccessTokenResponse> {
     val request =
-        post(uriBuilder().tokenUrl(realm))
-            .addFormHeaders()
-            .addParameter(CLIENT_ID, client)
-            .addParameter(USERNAME, user)
-            .addParameter(PASSWORD, password)
-            .addParameter(GRANT_TYPE, PASSWORD)
+      post(uriBuilder().tokenUrl(realm))
+        .addFormHeaders()
+        .addParameter(CLIENT_ID, client)
+        .addParameter(USERNAME, user)
+        .addParameter(PASSWORD, password)
+        .addParameter(GRANT_TYPE, PASSWORD)
 
     if (clientSecret != null) {
       request.addParameter(CLIENT_SECRET, clientSecret)
@@ -154,13 +153,13 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
 
   fun refreshToken(refreshToken: String, clientAssertion: String, dPoPToken: String): KeycloakResponse<AccessTokenResponse> {
     val request =
-        post(uriBuilder().tokenUrl())
-            .addFormHeaders()
-            .addHeader(DPOP_HTTP_HEADER, dPoPToken)
-            .addParameter(GRANT_TYPE, REFRESH_TOKEN)
-            .addParameter(REFRESH_TOKEN, refreshToken)
-            .addParameter(CLIENT_ASSERTION_TYPE, CLIENT_ASSERTION_TYPE_JWT)
-            .addParameter(CLIENT_ASSERTION, clientAssertion)
+      post(uriBuilder().tokenUrl())
+        .addFormHeaders()
+        .addHeader(DPOP_HTTP_HEADER, dPoPToken)
+        .addParameter(GRANT_TYPE, REFRESH_TOKEN)
+        .addParameter(REFRESH_TOKEN, refreshToken)
+        .addParameter(CLIENT_ASSERTION_TYPE, CLIENT_ASSERTION_TYPE_JWT)
+        .addParameter(CLIENT_ASSERTION, clientAssertion)
 
     return createHttpClient().use { it.execute(request.build()) }.mapJSONResponse<AccessTokenResponse>()
   }
@@ -170,7 +169,7 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
    *
    * @param subjectToken The access token to exchange.
    * @param clientId The client ID.
-   * @param subjectTokenType (optional) The subject token type, defaults to [ACCESS_TOKEN_TYPE].
+   * @param subjectTokenType (optional) The subject token type, defaults to [JWT_TOKEN_TYPE].
    * @param clientSecret (optional) The client secret.
    * @param requestedClientScope (optional) The requested client scope.
    * @param clientAssertionType (optional) The client assertion type, usually [org.keycloak.OAuth2Constants.CLIENT_ASSERTION_TYPE_JWT]
@@ -179,25 +178,25 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
    */
   @Suppress("LongParameterList", "kotlin:S107")
   fun tokenExchange(
-      clientId: String,
-      subjectToken: String,
-      subjectTokenType: String = JWT_TOKEN_TYPE,
-      clientSecret: String? = null,
-      requestedClientScope: String? = null,
-      requestedTokenType: String = REFRESH_TOKEN_TYPE,
-      clientAssertionType: String? = null,
-      clientAssertion: String? = null,
-      dPoPToken: String? = null,
-      audience: String? = null,
+    clientId: String,
+    subjectToken: String,
+    subjectTokenType: String = JWT_TOKEN_TYPE,
+    clientSecret: String? = null,
+    requestedClientScope: String? = null,
+    requestedTokenType: String = REFRESH_TOKEN_TYPE,
+    clientAssertionType: String? = null,
+    clientAssertion: String? = null,
+    dPoPToken: String? = null,
+    audience: String? = null,
   ): KeycloakResponse<AccessTokenResponse> {
     val request =
-        post(uriBuilder().tokenUrl())
-            .addFormHeaders()
-            .addParameter(CLIENT_ID, clientId)
-            .addParameter(GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE)
-            .addParameter(SUBJECT_TOKEN, subjectToken)
-            .addParameter(SUBJECT_TOKEN_TYPE, subjectTokenType)
-            .addParameter(REQUESTED_TOKEN_TYPE, requestedTokenType)
+      post(uriBuilder().tokenUrl())
+        .addFormHeaders()
+        .addParameter(CLIENT_ID, clientId)
+        .addParameter(GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE)
+        .addParameter(SUBJECT_TOKEN, subjectToken)
+        .addParameter(SUBJECT_TOKEN_TYPE, subjectTokenType)
+        .addParameter(REQUESTED_TOKEN_TYPE, requestedTokenType)
 
     if (requestedClientScope != null) {
       request.addParameter(SCOPE, requestedClientScope)
@@ -263,12 +262,12 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
     val expiration = 5.minutes.inWholeSeconds.toInt()
     val body = ClientInitialAccessCreatePresentation(expiration, 1).toJSON()
     val request =
-        post(uriBuilder().initialAccessTokenUrl())
-            .addJsonHeaders()
-            .addHeader(AUTHORIZATION, "$AUTH_HEADER_PREFIX$adminToken")
-            // Important value, but not mentioned in documentation 🙄
-            .addParameter(SCOPE, SCOPE_OPENID)
-            .setEntity(StringEntity(body))
+      post(uriBuilder().initialAccessTokenUrl())
+        .addJsonHeaders()
+        .addHeader(AUTHORIZATION, "$AUTH_HEADER_PREFIX$adminToken")
+        // Important value, but not mentioned in documentation 🙄
+        .addParameter(SCOPE, SCOPE_OPENID)
+        .setEntity(StringEntity(body))
 
     return createHttpClient().use { it.execute(request.build()) }.mapJSONResponse<ClientInitialAccessPresentation>()
   }
@@ -283,38 +282,38 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
    * @return A [KeycloakResponse] containing a [ClientRepresentation].
    */
   fun createClientKeycloak(
-      initialAccessToken: String,
-      newClientId: String,
-      expectedStatusCode: Int = SC_CREATED,
+    initialAccessToken: String,
+    newClientId: String,
+    expectedStatusCode: Int = SC_CREATED,
   ): KeycloakResponse<ClientRepresentation> {
     val body =
-        ClientRepresentation()
-            .apply {
-              id = newClientId
-              isFullScopeAllowed = true
-              isPublicClient = true
-              isBearerOnly = false
-              description = ZETA_GUARD_CLIENT_NAME
-              clientId = newClientId
-              name = ZETA_GUARD_CLIENT_NAME
-              isEnabled = true
-              isStandardFlowEnabled = true
-              clientAuthenticatorType = AUTH_TYPE_CLIENT_SECRET
-              attributes =
-                  mapOf(
-                      REALM_CLIENT to "false",
-                      STANDARD_TOKEN_EXCHANGE_ENABLED to "true",
-                      STANDARD_TOKEN_EXCHANGE_REFRESH_ENABLED to SAME_SESSION.name,
-                      ATTRIBUTE_ATTESTATION_STATE to ATTESTATION_STATE_VALID,
-                  )
-            }
-            .toJSON()
+      ClientRepresentation()
+        .apply {
+          id = newClientId
+          isFullScopeAllowed = true
+          isPublicClient = true
+          isBearerOnly = false
+          description = ZETA_GUARD_CLIENT_NAME
+          clientId = newClientId
+          name = ZETA_GUARD_CLIENT_NAME
+          isEnabled = true
+          isStandardFlowEnabled = true
+          clientAuthenticatorType = AUTH_TYPE_CLIENT_SECRET
+          attributes =
+            mapOf(
+              REALM_CLIENT to "false",
+              STANDARD_TOKEN_EXCHANGE_ENABLED to "true",
+              STANDARD_TOKEN_EXCHANGE_REFRESH_ENABLED to SAME_SESSION.name,
+              ATTRIBUTE_ATTESTATION_STATE to ATTESTATION_STATE_VALID,
+            )
+        }
+        .toJSON()
 
     val request =
-        post(uriBuilder().clientRegistrationKeycloakUrl())
-            .addJsonHeaders()
-            .addHeader(AUTHORIZATION, "$AUTH_HEADER_PREFIX$initialAccessToken")
-            .setEntity(StringEntity(body))
+      post(uriBuilder().clientRegistrationKeycloakUrl())
+        .addJsonHeaders()
+        .addHeader(AUTHORIZATION, "$AUTH_HEADER_PREFIX$initialAccessToken")
+        .setEntity(StringEntity(body))
 
     return createHttpClient().use { it.execute(request.build()) }.mapJSONResponse<ClientRepresentation>(expectedStatusCode)
   }
@@ -331,19 +330,19 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
    */
   fun createClientOIDC(webKeySet: JSONWebKeySet, expectedStatusCode: Int = SC_CREATED): KeycloakResponse<OIDCClientRepresentation> {
     val body =
-        OIDCClientRepresentation()
-            .apply {
-              clientName = ZETA_GUARD_CLIENT_NAME
+      OIDCClientRepresentation()
+        .apply {
+          clientName = ZETA_GUARD_CLIENT_NAME
 
-              // See https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/gemSpec_ZETA_V1.1.0/#A_27799
-              grantTypes = VALID_GRANT_TYPES
-              tokenEndpointAuthMethod = PRIVATE_KEY_JWT // "none" -> public client
-              tokenEndpointAuthSigningAlg = ES256
-              //          dpopBoundAccessTokens = true
-              jwks = webKeySet
-              responseTypes = listOf(OIDCResponseType.TOKEN) // DPoPUtil.DPOP_TOKEN_TYPE
-            }
-            .toJSON()
+          // See https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/gemSpec_ZETA_V1.1.0/#A_27799
+          grantTypes = VALID_GRANT_TYPES
+          tokenEndpointAuthMethod = PRIVATE_KEY_JWT // "none" -> public client
+          tokenEndpointAuthSigningAlg = ES256
+          //          dpopBoundAccessTokens = true
+          jwks = webKeySet
+          responseTypes = listOf(OIDCResponseType.TOKEN) // DPoPUtil.DPOP_TOKEN_TYPE
+        }
+        .toJSON()
 
     val request = post(uriBuilder().clientRegistrationOIDCUrl()).addJsonHeaders().setEntity(StringEntity(body, Charsets.UTF_8))
 
@@ -358,19 +357,19 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
    * @return An [Either] containing a [KeycloakError] or a [KeycloakSuccessResponse] with a [T].
    */
   inline fun <reified T> HttpResponse.mapJSONResponse(expectedStatusCode: Int = SC_OK): KeycloakResponse<T> =
-      if (this.statusLine.statusCode != expectedStatusCode) {
-        mapError()
-      } else {
-        val clazz = T::class.java
-        val body = `as`<T>()
+    if (this.statusLine.statusCode != expectedStatusCode) {
+      mapError()
+    } else {
+      val clazz = T::class.java
+      val body = `as`<T>()
 
-        body
-            .map { KeycloakSuccessResponse(it) }
-            .mapLeft { KeycloakError(it.message(), "Could not create ${clazz.simpleName} from " + asString(), this.statusLine.statusCode) }
-      }
+      body
+        .map { KeycloakSuccessResponse(it) }
+        .mapLeft { KeycloakError(it.message(), "Could not create ${clazz.simpleName} from " + asString(), this.statusLine.statusCode) }
+    }
 
   fun HttpResponse.mapError(): Either<KeycloakError, Nothing> =
-      asError().mapLeft { KeycloakError(it.message(), asString(), this.statusLine.statusCode) }.merge().left()
+    asError().mapLeft { KeycloakError(it.message(), asString(), this.statusLine.statusCode) }.merge().left()
 
   /**
    * Maps an [HttpResponse] to an [Either] of [KeycloakError] or [KeycloakSuccessResponse].
@@ -379,11 +378,11 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
    * @return An [Either] containing a [KeycloakError] or a [KeycloakSuccessResponse] containing the response body string
    */
   fun HttpResponse.mapStringResponse(expectedStatusCode: Int = SC_OK): KeycloakResponse<String> =
-      if (this.statusLine.statusCode != expectedStatusCode) {
-        mapError()
-      } else {
-        KeycloakSuccessResponse(asString()).right()
-      }
+    if (this.statusLine.statusCode != expectedStatusCode) {
+      mapError()
+    } else {
+      KeycloakSuccessResponse(asString()).right()
+    }
 
   /**
    * Deserializes a [HttpResponse] to an object of type [T].
@@ -423,8 +422,8 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
 
     if (scheme == "https") {
       httpClientBuilder
-          .setSSLContext(SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
-          .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+        .setSSLContext(SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+        .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
     }
 
     currentBody = null
@@ -434,7 +433,7 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
 }
 
 private fun RequestBuilder.addJsonHeaders(): RequestBuilder =
-    addHeader(CONTENT_TYPE, APPLICATION_JSON.mimeType).addHeader(ACCEPT, APPLICATION_JSON.mimeType)
+  addHeader(CONTENT_TYPE, APPLICATION_JSON.mimeType).addHeader(ACCEPT, APPLICATION_JSON.mimeType)
 
 private fun RequestBuilder.addFormHeaders(): RequestBuilder =
-    addHeader(CONTENT_TYPE, APPLICATION_FORM_URLENCODED.mimeType).addHeader(ACCEPT, APPLICATION_JSON.mimeType)
+  addHeader(CONTENT_TYPE, APPLICATION_FORM_URLENCODED.mimeType).addHeader(ACCEPT, APPLICATION_JSON.mimeType)

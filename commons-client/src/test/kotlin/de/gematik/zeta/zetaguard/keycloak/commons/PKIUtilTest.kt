@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,14 +23,17 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.commons
 
+import de.gematik.zeta.zetaguard.keycloak.commons.server.generateKeyPair
+import de.gematik.zeta.zetaguard.keycloak.commons.server.generatePKIData
 import io.kotest.assertions.throwables.shouldNotThrow
-import io.kotest.core.spec.style.FunSpec
 
-class PKIUtilTest : FunSpec() {
+const val CURVE_BRAINPOOL = "brainpoolP256r1"
+
+class PKIUtilTest : ZetaGuardFunSpec() {
   init {
     test("Validate brainpool") {
-      shouldNotThrow<Exception> { PKIUtil.generateECKeys() }
-      shouldNotThrow<Exception> { PKIUtil.generateECKeyPair(CURVE_BRAINPOOL) }
+      shouldNotThrow<Exception> { generatePKIData() }
+      shouldNotThrow<Exception> { generateKeyPair(CURVE_BRAINPOOL) }
     }
   }
 }

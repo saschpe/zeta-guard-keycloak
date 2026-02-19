@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,19 +73,19 @@ class ZetaGuardClientRegistrationPolicyFactory : ClientRegistrationPolicyFactory
     logger.info("Checking for outdated client registrations every $interval")
 
     timerProviderFactory
-        .create(factory.create())
-        .schedule(
-            {
-              runJobInTransaction(factory) { //
-                runExpiration(it).onLeft { //
-                e ->
-                  logger.warn("Error while checking for client registration expiration", e)
-                }
-              }
-            },
-            interval.toMillis(),
-            CLIENT_REGISTRATION_POLICY_PROVIDER_ID,
-        )
+      .create(factory.create())
+      .schedule(
+        {
+          runJobInTransaction(factory) { //
+            runExpiration(it).onLeft { //
+            e ->
+              logger.warn("Error while checking for client registration expiration", e)
+            }
+          }
+        },
+        interval.toMillis(),
+        CLIENT_REGISTRATION_POLICY_PROVIDER_ID,
+      )
   }
 
   override fun getHelpText(): String = "Setup newly created clients"
@@ -94,41 +94,45 @@ class ZetaGuardClientRegistrationPolicyFactory : ClientRegistrationPolicyFactory
 
   override fun getConfigProperties(session: KeycloakSession) = getConfigProperties()
 
-  override fun init(config: Config.Scope) {}
+  override fun init(config: Config.Scope) {
+    // No-op
+  }
 
-  override fun close() {}
+  override fun close() {
+    // No-op
+  }
 
   private fun runExpiration(session: KeycloakSession): Either<Throwable, Success> =
-      Either.catch {
-        logger.debug("Checking for outdated client registrations")
-        val realm = session.realms().getRealmByName(ZETA_REALM)
+    Either.catch {
+      logger.debug("Checking for outdated client registrations")
+      val realm = session.realms().getRealmByName(ZETA_REALM)
 
-        if (realm != null) { // May happen at startup
-          val clients = session.clients()
-          val timeToLive = CLIENT_REGISTRATION_TTL.toDuration()
-          val outdatedClients =
-              clients
-                  .getClientsStream(realm) // Optimized/paginated stream
-                  .filter { it.getAttribute(ATTRIBUTE_ATTESTATION_STATE) == ATTESTATION_STATE_PENDING }
-                  .filter {
-                    val createdAtString =
-                        it.getAttribute(ATTRIBUTE_CREATED_AT)
-                            ?: throw IllegalStateException("Missing client attribute $ATTRIBUTE_CREATED_AT for client ${it.clientId}")
-                    val createdAt = createdAtString.toLocalDateTime()
-                    val expiresAt = createdAt.plus(timeToLive)
+      if (realm != null) { // May happen at startup
+        val clients = session.clients()
+        val timeToLive = CLIENT_REGISTRATION_TTL.toDuration()
+        val outdatedClients =
+          clients
+            .getClientsStream(realm) // Optimized/paginated stream
+            .filter { it.getAttribute(ATTRIBUTE_ATTESTATION_STATE) == ATTESTATION_STATE_PENDING }
+            .filter {
+              val createdAtString =
+                it.getAttribute(ATTRIBUTE_CREATED_AT)
+                  ?: throw IllegalStateException("Missing client attribute $ATTRIBUTE_CREATED_AT for client ${it.clientId}")
+              val createdAt = createdAtString.toLocalDateTime()
+              val expiresAt = createdAt.plus(timeToLive)
 
-                    LocalDateTime.now().isAfter(expiresAt)
-                  }
-                  .map { it.id }
-                  .toList()
+              LocalDateTime.now().isAfter(expiresAt)
+            }
+            .map { it.id }
+            .toList()
 
-          logger.debug("Outdated client registrations: $outdatedClients")
+        logger.debug("Outdated client registrations: $outdatedClients")
 
-          outdatedClients.forEach { clients.removeClient(realm, it) }
-        }
-
-        SimpleSuccess
+        outdatedClients.forEach { clients.removeClient(realm, it) }
       }
+
+      SimpleSuccess
+    }
 
   companion object {
     private val logger: Logger = Logger.getLogger(ZetaGuardClientRegistrationPolicyFactory::class.java)

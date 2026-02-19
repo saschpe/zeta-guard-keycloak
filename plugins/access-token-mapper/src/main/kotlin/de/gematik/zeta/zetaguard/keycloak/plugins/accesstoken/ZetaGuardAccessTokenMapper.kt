@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.plugins.accesstoken
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import de.gematik.zeta.zetaguard.keycloak.commons.EncodingUtil.toObject
+import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.toObject
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.ClientInstanceData
 import de.gematik.zeta.zetaguard.keycloak.commons.expirationDate
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ACCESSTOKEN_MAPPERPROVIDER_ID
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_CLIENT_ASSESSMENT_DATA
@@ -54,18 +54,18 @@ import org.keycloak.representations.RefreshToken
  * Realm configuration in 12-create-zeta-guard-scope.sh
  */
 class ZetaGuardAccessTokenMapper :
-    AbstractOIDCProtocolMapper(), OIDCAccessTokenMapper, OIDCIDTokenMapper, OIDCRefreshTokenMapper, OIDCAccessTokenResponseMapper {
+  AbstractOIDCProtocolMapper(), OIDCAccessTokenMapper, OIDCIDTokenMapper, OIDCRefreshTokenMapper, OIDCAccessTokenResponseMapper {
   override fun getDisplayCategory() = TOKEN_MAPPER_CATEGORY
 
   override fun getDisplayType() = "\uD835\uDF75-Guard Access Token Mapper"
 
   override fun getHelpText() =
-      """
-      Map SMC-B based values into generated token:
-      - Subject (Telematik-ID)
-      - Expiration
-      """
-          .trimIndent()
+    """
+    Map SMC-B based values into generated token:
+    - Subject (Telematik-ID)
+    - Expiration
+    """
+      .trimIndent()
 
   override fun getConfigProperties() = listOf<ProviderConfigProperty>()
 
@@ -79,32 +79,38 @@ class ZetaGuardAccessTokenMapper :
   override fun getPriority() = PRIORITY_SCRIPT_MAPPER * 2
 
   override fun setClaim(
-      token: IDToken,
-      mappingModel: ProtocolMapperModel,
-      userSession: UserSessionModel,
-      keycloakSession: KeycloakSession,
-      clientSessionCtx: ClientSessionContext,
+    token: IDToken,
+    mappingModel: ProtocolMapperModel,
+    userSession: UserSessionModel,
+    keycloakSession: KeycloakSession,
+    clientSessionCtx: ClientSessionContext,
   ) {
     setClaims(userSession, token) { it.accessTokenTTL }
   }
 
   override fun transformRefreshToken(
-      token: RefreshToken,
-      mappingModel: ProtocolMapperModel,
-      session: KeycloakSession,
-      userSession: UserSessionModel,
-      clientSession: ClientSessionContext,
+    token: RefreshToken,
+    mappingModel: ProtocolMapperModel,
+    session: KeycloakSession,
+    userSession: UserSessionModel,
+    clientSession: ClientSessionContext,
   ): RefreshToken {
     setClaims(userSession, token) { it.refreshTokenTTL }
 
     return token
   }
 
+  /**
+   * Set expiration TTLs, dynamically determined via OPA.
+   *
+   * https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_25664
+   * https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_28527
+   */
   private fun setClaims(userSession: UserSessionModel, token: IDToken, ttlMapper: (ZetaGuardTokenExchangeData) -> Duration) {
     val contextString = userSession.getNote(ATTRIBUTE_SMCB_CONTEXT) ?: throw IllegalStateException("SMC-B context not found")
     val clientDataString = userSession.getNote(ATTRIBUTE_CLIENT_ASSESSMENT_DATA) ?: throw IllegalStateException("Client assessment data not found")
     val exchangeData = contextString.toObject<ZetaGuardTokenExchangeData>()
-    val clientData = ObjectMapper().readValue(clientDataString, Map::class.java)
+    val clientData = clientDataString.toObject<ClientInstanceData>()
 
     token.subject(exchangeData.telematikID)
     token.expirationDate(ttlMapper(exchangeData))

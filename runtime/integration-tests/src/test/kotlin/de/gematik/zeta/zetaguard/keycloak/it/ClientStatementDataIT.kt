@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,78 +25,69 @@
 
 package de.gematik.zeta.zetaguard.keycloak.it
 
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.AppleProductId
 import de.gematik.zeta.zetaguard.keycloak.commons.CLIENT_B_SCOPE
-import de.gematik.zeta.zetaguard.keycloak.commons.EncodingUtil.asMap
 import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.FIELD_CLIENT_ID
-import de.gematik.zeta.zetaguard.keycloak.commons.createClientData
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_CLIENT_SELF_ASSESSMENT
+import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
+import de.gematik.zeta.zetaguard.keycloak.commons.clientStatementData
+import de.gematik.zeta.zetaguard.keycloak.commons.createOtherClaims
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_CLIENT_STATEMENT
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
-import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
+import de.gematik.zeta.zetaguard.keycloak.commons.server.generatePKIData
 import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.leafCertificate
 import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.Order
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.string.shouldContain
 
 @Order(1)
-class ClientDataIT : FunSpec() {
+class ClientStatementDataIT : ZetaGuardFunSpec() {
   val keycloakWebClient = KeycloakWebClient()
   val baseUri = keycloakWebClient.uriBuilder().build().toString()
   val realmUrl = keycloakWebClient.uriBuilder().realmUrl().toString()
 
   init {
-    test("Valid client data") {
+    test("Invalid combination") {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val otherClaims = mapOf(CLAIM_CLIENT_SELF_ASSESSMENT to createClientData(ZETA_CLIENT).asMap())
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), otherClaims)
-      val smcbToken = createSMCBToken(nonce)
+      val otherClaims = createOtherClaims(ZETA_CLIENT, nonce, smcbTokenGenerator.keys).toMutableMap()
+      val invalidStatement = clientStatementData(ZETA_CLIENT, nonce, smcbTokenGenerator.keys, AppleProductId("macos", listOf("bundle")))
+      otherClaims[CLAIM_CLIENT_STATEMENT] = invalidStatement
 
-      keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt)
-    }
-
-    test("Enforce parse error") {
-      val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val map = createClientData(ZETA_CLIENT).asMap().toMutableMap().apply { remove(FIELD_CLIENT_ID) }
-      val otherClaims = mapOf(CLAIM_CLIENT_SELF_ASSESSMENT to map)
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), otherClaims)
+      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce, otherClaims)
       val smcbToken = createSMCBToken(nonce)
 
       keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt) {
-        it.errorDescription shouldContain "clientId"
+        it.errorDescription shouldContain "Invalid combination"
       }
     }
 
-    test("Missing client data") {
+    test("Invalid attestation challenge") {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), mapOf())
+      val otherClaims = createOtherClaims(ZETA_CLIENT, nonce, generatePKIData())
+      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce, otherClaims)
       val smcbToken = createSMCBToken(nonce)
 
       keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt) {
-        it.errorDescription shouldContain CLAIM_CLIENT_SELF_ASSESSMENT
+        it.errorDescription shouldContain "Attestation challenge does not match"
       }
     }
 
-    test("Invalid client data") {
+    test("Invalid attestation timestamp") {
       val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      val otherClaims = mapOf(CLAIM_CLIENT_SELF_ASSESSMENT to createClientData(ZETA_CLIENT, "jens"))
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), otherClaims)
+      val otherClaims = createOtherClaims(ZETA_CLIENT, nonce, smcbTokenGenerator.keys).toMutableMap()
+      val invalidStatement = clientStatementData(ZETA_CLIENT, nonce, smcbTokenGenerator.keys, timeStampSeconds = 12)
+      otherClaims[CLAIM_CLIENT_STATEMENT] = invalidStatement
+
+      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce, otherClaims)
       val smcbToken = createSMCBToken(nonce)
 
       keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt) {
-        it.errorDescription shouldContain "Invalid Email address"
+        it.errorDescription shouldContain "Invalid attestation timestamp"
       }
     }
   }
 
   private fun createSMCBToken(nonce: String): String =
-      smcbTokenGenerator.generateSMCBToken(nonceString = nonce, audiences = listOf(baseUri), certificateChain = listOf(leafCertificate))
-
-  companion object {
-    init {
-      setupBouncyCastle()
-    }
-  }
+    smcbTokenGenerator.generateSMCBToken(nonceString = nonce, audiences = listOf(baseUri), certificateChain = listOf(leafCertificate))
 }

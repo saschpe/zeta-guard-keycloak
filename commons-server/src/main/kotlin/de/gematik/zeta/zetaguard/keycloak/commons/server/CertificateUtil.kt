@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import arrow.core.raise.ensure
 import java.io.StringWriter
 import java.security.Key
 import java.security.PublicKey
-import java.security.Security
 import java.security.SignatureException
 import java.security.cert.CertPathValidator
 import java.security.cert.CertificateFactory
@@ -48,13 +47,13 @@ import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
 import org.bouncycastle.asn1.x500.style.IETFUtils
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter
 
 const val CRT_GEMATIK_ROOT = "gem.smcb-ca1_test-only"
 const val CRT_GEMATIK_ROOT_DN = "CN=GEM.RCA1 TEST-ONLY, OU=Zentrale Root-CA der Telematikinfrastruktur, O=gematik GmbH NOT-VALID, C=DE"
 const val CRT_GEMATIK_INTERMEDIATE = "gem.smcb-ca57_test-only"
+const val CRT_GEMATIK_INTERMEDIATE_DN = "C=DE, O=gematik GmbH NOT-VALID, OU=Institution des Gesundheitswesens-CA der Telematikinfrastruktur, CN=GEM.SMCB-CA8 TEST-ONLY"
 const val CRT_GEMATIK_LEAF = "zeta.c_smcb_aut"
 const val CRT_GEMATIK_LEAF_NAME = "Arztpraxis Ann-Beatrixe Zeta TEST-ONLY"
 const val CRT_GEMATIK_LEAF_ORGANISATION = "300060625 NOT-VALID"
@@ -155,33 +154,3 @@ fun X509Certificate.subjectOrganisationName() = getSubjectComponent(BCStyle.O)
 
 private fun X509Certificate.getSubjectComponent(identifier: ASN1ObjectIdentifier) =
     X500Name(subjectX500Principal.name).getRDNs(identifier).map { IETFUtils.valueToString(it.first.value) }.firstOrNull() ?: "Unbekannt"
-
-fun setupBouncyCastle() {
-  val indexOfBC1 = Security.getProviders().indexOfFirst { it.name == PROVIDER_NAME }
-
-  when (indexOfBC1) {
-    0 -> {
-      logger.info("BouncyCastle is set as default security provider")
-      return
-    }
-
-    -1 -> {
-      logger.info("BouncyCastle not found in list")
-    }
-
-    else -> {
-      logger.info("BouncyCastle found in list, but is not the default security provider")
-      Security.removeProvider(PROVIDER_NAME)
-    }
-  }
-
-  val indexOfBC2 = Security.getProviders().indexOfFirst { it.name == PROVIDER_NAME }
-  assert(indexOfBC2 < 0) { "BC provider still present in list!" }
-
-  logger.info("Setting BouncyCastle as default security provider")
-
-  Security.insertProviderAt(BouncyCastleProvider(), 1)
-
-  val indexOfBC3 = Security.getProviders().indexOfFirst { it.name == PROVIDER_NAME }
-  assert(indexOfBC3 == 0) { "BC provider is still not the default security provider!" }
-}

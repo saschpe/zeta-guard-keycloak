@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,24 +47,26 @@ class ZetaGuardWellKnownProvider(private val session: KeycloakSession) : WellKno
     val noncePath = frontendUriInfo.baseUriBuilder.path(RealmsResource::class.java).path(NONCE_PATH).build(realm.name)
 
     return ZetaGuardWellKnownConfiguration(
-        issuer = URI.create(wellknown.issuer),
-        authorizationEndpoint = URI.create(wellknown.authorizationEndpoint),
-        tokenEndpoint = URI.create(wellknown.tokenEndpoint),
-        nonceEndpoint = noncePath,
-        openidProvidersEndpoint = KeycloakUriBuilder(frontendUriInfo).clientRegistrationOIDCUrl(realm.name),
-        serviceDocumentation = serviceDocumentationUri(),
-        jwksUri = URI.create(wellknown.jwksUri),
-        scopesSupported = wellknown.scopesSupported,
-        responseTypesSupported = listOf("code", "token"),
-        responseModesSupported = wellknown.responseModesSupported,
-        grantTypesSupported = wellknown.grantTypesSupported,
-        tokenEndpointAuthMethodsSupported = wellknown.tokenEndpointAuthMethodsSupported,
-        tokenEndpointAuthSigningAlgValuesSupported = wellknown.tokenEndpointAuthSigningAlgValuesSupported,
-        uiLocalesSupported = listOf(Locale.GERMAN, Locale.ENGLISH).map { it.toString() },
-        codeChallengeMethodsSupported = wellknown.codeChallengeMethodsSupported,
-        apiVersionsSupported = listOf(ApiVersionsSupported(documentationUri = serviceDocumentationUri())),
+      issuer = URI.create(wellknown.issuer),
+      authorizationEndpoint = URI.create(wellknown.authorizationEndpoint),
+      tokenEndpoint = URI.create(wellknown.tokenEndpoint),
+      nonceEndpoint = noncePath,
+      openidProvidersEndpoint = KeycloakUriBuilder(frontendUriInfo).clientRegistrationOIDCUrl(realm.name),
+      serviceDocumentation = serviceDocumentationUri(),
+      jwksUri = URI.create(wellknown.jwksUri),
+      scopesSupported = wellknown.scopesSupported,
+      responseTypesSupported = listOf("code", "token"),
+      responseModesSupported = wellknown.responseModesSupported,
+      grantTypesSupported = wellknown.grantTypesSupported,
+      tokenEndpointAuthMethodsSupported = wellknown.tokenEndpointAuthMethodsSupported,
+      tokenEndpointAuthSigningAlgValuesSupported = wellknown.tokenEndpointAuthSigningAlgValuesSupported,
+      uiLocalesSupported = listOf(Locale.GERMAN, Locale.ENGLISH).map { it.toString() },
+      codeChallengeMethodsSupported = wellknown.codeChallengeMethodsSupported,
+      apiVersionsSupported = listOf(ApiVersionsSupported(documentationUri = serviceDocumentationUri())),
     )
   }
 
-  override fun close() {}
+  override fun close() {
+    // No-op
+  }
 }
