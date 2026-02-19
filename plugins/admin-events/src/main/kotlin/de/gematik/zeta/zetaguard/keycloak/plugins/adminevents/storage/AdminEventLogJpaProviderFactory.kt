@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,15 +31,25 @@ import org.keycloak.models.KeycloakSessionFactory
 
 const val ADMIN_EVENTS_JPA_PROVIDER_ID = "zeta-guard-admin-events-jpa"
 
-/** Factory for creating instances of [AdminEventLogJpaProvider]. */
+/**
+ * Factory for creating instances of [AdminEventLogJpaProvider].
+ *
+ * See META-INF/services/org.keycloak.connections.jpa.entityprovider.JpaEntityProviderFactory
+ */
 class AdminEventLogJpaProviderFactory : JpaEntityProviderFactory {
   override fun create(keycloakSession: KeycloakSession): JpaEntityProvider = AdminEventLogJpaProvider()
 
-  override fun init(scope: Config.Scope) {}
+  override fun init(scope: Config.Scope) {
+    // No-op
+  }
 
-  override fun postInit(keycloakSessionFactory: KeycloakSessionFactory) {}
+  override fun postInit(keycloakSessionFactory: KeycloakSessionFactory) {
+    // No-op
+  }
 
-  override fun close() {}
+  override fun close() {
+    // No-op
+  }
 
   override fun getId() = ADMIN_EVENTS_JPA_PROVIDER_ID
 }

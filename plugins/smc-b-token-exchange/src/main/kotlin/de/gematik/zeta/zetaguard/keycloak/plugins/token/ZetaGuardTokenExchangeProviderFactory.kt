@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,8 +74,6 @@ open class ZetaGuardTokenExchangeProviderFactory() : TokenExchangeProviderFactor
     keystoreService = keystoreService()
   }
 
-  override fun close() {}
-
   override fun getId() = ZETAGUARD_TOKEN_EXCHANGE_PROVIDER_ID
 
   // Higher priority than standard token exchange provider
@@ -86,12 +84,14 @@ open class ZetaGuardTokenExchangeProviderFactory() : TokenExchangeProviderFactor
   private fun keystoreLocation(): InputStream {
     val file = File(SMCB_KEYSTORE_LOCATION)
 
-    if (!file.exists() || !file.isFile) {
-      throw IllegalStateException("Keystore not found at $SMCB_KEYSTORE_LOCATION")
-    }
+    check(file.exists() && file.isFile) { "Keystore not found at $SMCB_KEYSTORE_LOCATION" }
 
     return FileInputStream(file)
   }
 
   private fun keystorePassword() = SMCB_KEYSTORE_PASSWORD
+
+  override fun close() {
+    // No-op
+  }
 }

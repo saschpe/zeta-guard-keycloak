@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,8 +51,6 @@ open class NonceProviderFactory : RealmResourceProviderFactory {
 
   override fun create(session: KeycloakSession) = NonceProvider(session, nonceFactory)
 
-  override fun init(config: Config.Scope) {}
-
   override fun postInit(factory: KeycloakSessionFactory) {
     assert(!this::nonceFactory.isInitialized) { "NonceFactory already initialized" }
 
@@ -65,5 +63,11 @@ open class NonceProviderFactory : RealmResourceProviderFactory {
   // May be overriden for testing purposes
   protected open fun nonceTimeToLive(): Duration = Duration.parse(NONCE_TTL)
 
-  override fun close() {}
+  override fun init(config: Config.Scope) {
+    // No-op
+  }
+
+  override fun close() {
+    // No-op
+  }
 }

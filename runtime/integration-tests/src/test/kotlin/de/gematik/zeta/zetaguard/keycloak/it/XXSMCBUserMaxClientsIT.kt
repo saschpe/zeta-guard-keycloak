@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,15 +24,14 @@
 package de.gematik.zeta.zetaguard.keycloak.it
 
 import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
-import de.gematik.zeta.zetaguard.keycloak.commons.PKIUtil.generateECKeys
+import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
 import de.gematik.zeta.zetaguard.keycloak.commons.server.KeycloakError
-import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
+import de.gematik.zeta.zetaguard.keycloak.commons.server.generatePKIData
 import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.leafCertificate
 import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.Order
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.string.shouldContain
 import org.keycloak.OAuth2Constants.CLIENT_ASSERTION_TYPE_JWT
@@ -44,7 +43,7 @@ import org.keycloak.OAuth2Constants.JWT_TOKEN_TYPE
  * See docker-compose-it.yml.
  */
 @Order(10)
-class XXSMCBUserMaxClientsIT : FunSpec() {
+class XXSMCBUserMaxClientsIT : ZetaGuardFunSpec() {
   init {
     val keycloakWebClient = KeycloakWebClient()
     val baseUri = keycloakWebClient.uriBuilder().build().toString()
@@ -58,37 +57,31 @@ class XXSMCBUserMaxClientsIT : FunSpec() {
         val oidcClientResponse1 = keycloakWebClient.createClientOIDC(jwsTokenGenerator.keys.jwks).shouldBeRight().reponseObject
         val nonce1 = keycloakWebClient.getNonce().shouldBeRight().reponseObject
         val smbcToken1 =
-            smcbTokenGenerator.generateSMCBToken(
-                nonceString = nonce1,
-                audiences = audiences,
-                issuer = oidcClientResponse1.clientId,
-                issuedFor = oidcClientResponse1.clientId,
-                certificateChain = listOf(leafCertificate),
-            )
-        val jws1 = jwsTokenGenerator.generateClientAssertion(oidcClientResponse1)
-        val keys = generateECKeys()
+          smcbTokenGenerator.generateSMCBToken(
+            nonceString = nonce1,
+            audiences = audiences,
+            issuer = oidcClientResponse1.clientId,
+            issuedFor = oidcClientResponse1.clientId,
+            certificateChain = listOf(leafCertificate),
+          )
+        val jws1 = jwsTokenGenerator.generateClientAssertion(oidcClientResponse1, nonce1)
+        val keys = generatePKIData()
         val dPoPToken = smcbTokenGenerator.generateDPoPToken(keys, endpointURL = keycloakWebClient.uriBuilder().tokenUrl(), accessToken = smbcToken1)
 
         keycloakWebClient
-            .tokenExchange(
-                clientId = oidcClientResponse1.clientId,
-                subjectToken = smbcToken1,
-                subjectTokenType = JWT_TOKEN_TYPE,
-                clientAssertionType = CLIENT_ASSERTION_TYPE_JWT,
-                clientAssertion = jws1,
-                dPoPToken = dPoPToken,
-            )
-            .onLeft { error = it }
+          .tokenExchange(
+            clientId = oidcClientResponse1.clientId,
+            subjectToken = smbcToken1,
+            subjectTokenType = JWT_TOKEN_TYPE,
+            clientAssertionType = CLIENT_ASSERTION_TYPE_JWT,
+            clientAssertion = jws1,
+            dPoPToken = dPoPToken,
+          )
+          .onLeft { error = it }
         i++
       }
 
       error.shouldNotBeNull().errorDescription shouldContain "Too many clients"
-    }
-  }
-
-  companion object {
-    init {
-      setupBouncyCastle()
     }
   }
 }

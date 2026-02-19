@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,8 +64,6 @@ fun JsonWebToken.expirationDate(ttl: Duration) {
 }
 
 fun JsonWebToken.issuedAt(): LocalDateTime = iat.secondsToLocalDateTime()
-
-// fun Long.toLocalDateTime(): LocalDateTime = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDateTime()
 
 fun Long.secondsToLocalDateTime(): LocalDateTime = Instant.ofEpochSecond(this).atZone(ZoneId.systemDefault()).toLocalDateTime()
 

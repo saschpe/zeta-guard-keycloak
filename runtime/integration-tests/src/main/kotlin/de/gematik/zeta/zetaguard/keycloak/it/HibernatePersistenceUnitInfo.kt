@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  * #L%
  */
+@file:Suppress("removal")
+
 package de.gematik.zeta.zetaguard.keycloak.it
 
 import jakarta.persistence.SharedCacheMode
@@ -41,6 +43,10 @@ class HibernatePersistenceUnitInfo(
   override fun getPersistenceUnitName() = persistenceUnitName
 
   override fun getPersistenceProviderClassName(): String = HibernatePersistenceProvider::class.java.simpleName
+
+  override fun getScopeAnnotationName() = null
+
+  override fun getQualifierAnnotationNames(): List<String> = listOf()
 
   override fun getTransactionType() = PersistenceUnitTransactionType.RESOURCE_LOCAL
 

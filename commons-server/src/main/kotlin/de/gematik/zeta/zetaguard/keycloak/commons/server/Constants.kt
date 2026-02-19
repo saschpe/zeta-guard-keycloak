@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ const val ATTRIBUTE_ATTESTATION_STATE = "zeta-guard.client.attestation_state"
 const val ATTRIBUTE_CREATED_AT = "zeta-guard.client.created_at"
 
 const val CLAIM_CLIENT_SELF_ASSESSMENT = "urn:telematik:client-self-assessment"
+const val CLAIM_CLIENT_STATEMENT = "client_statement"
 const val CLAIM_ACCESS_TOKEN_CLIENT_DATA = "cdat"
 
 const val ZETA_REALM = "zeta-guard"

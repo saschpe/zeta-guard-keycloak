@@ -27,7 +27,7 @@ services:
     environment:
       PRINT_ENV: true
       JAVA_LOCALE: -Duser.timezone=Europe/Berlin
-      JAVA_OPTS_APPEND: -ea
+      JAVA_OPTS_APPEND: -ea ${COVERAGE_OPTS}
 
       # Put Keycloak build options in the first build stage of the container image
       KC_DB: postgres
@@ -49,6 +49,8 @@ services:
       SMCB_USER_MAX_CLIENTS: 20
       CLIENT_REGISTRATION_TTL: "PT4S"
       CLIENT_REGISTRATION_SCHEDULER_INTERVAL: "PT3S"
+      # TODO: Delete me when client is ready
+      CHECK_CLIENT_ATTESTATION_ENABLED: true
     ports:
       - "127.0.0.1:18080:8080" # api port
       - "19000:9000" # mgmt
@@ -56,6 +58,10 @@ services:
       - zeta-guard
     volumes:
       - ../smcb-certificates.p12:/opt/keycloak/conf/smcb-certificates.p12
+      - ./target/classes/libs/jacoco-agent.jar:/opt/keycloak/bin/jacoco-agent.jar
+      - ./target:/opt/keycloak/data
+    # Give KC more time to write logs and jacoco exec file
+    stop_grace_period: 30s
     healthcheck:
       # No curl in Keycloak 🙄
       test: |

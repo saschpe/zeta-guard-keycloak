@@ -10,9 +10,9 @@ spec:
 stages:
   - build
   - test
+  - release
   - publish
   - container-scanning
-  - release
 
 include:
   - component: $CI_SERVER_FQDN/zeta/zeta-ci-cd-components/dependency-check-mvn@v0.4.0
@@ -27,24 +27,43 @@ include:
       job-stage: container-scanning
       severity: UNKNOWN,HIGH,CRITICAL
     rules:
+      - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      - if: $CI_COMMIT_TAG
       - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 default:
   image: $CI_REGISTRY/zeta/devops/ci-images/maven:3.9-eclipse-temurin-21-zeta-0
   tags: [ zeta ]
+  interruptible: true
   cache:
     paths:
       - .m2/repository
 
   services:
-    - name: docker:25.0.5-dind
+    - name: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/docker:25.0.5-dind
+      alias: docker
       variables:
         HEALTHCHECK_TCP_PORT: "2376"
 
   before_script: |
+    printf "Docker login to %s\n" "$CI_REGISTRY"
+    printf "Docker login to %s\n" "$CI_DEPENDENCY_PROXY_SERVER"
+    
     printf "%s" "$CI_DEPENDENCY_PROXY_PASSWORD" | docker login "$CI_DEPENDENCY_PROXY_SERVER" -u "$CI_DEPENDENCY_PROXY_USER" --password-stdin
     printf "%s" "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
     printf "Executing mvn %s -P %s verify" "$MAVEN_CLI_OPTS" "$MAVEN_PROFILES"
+
+.rules_mr_default:
+  rules:
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+      when: on_success
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - when: never
+
+.rules_tags:
+  rules:
+    - if: $CI_COMMIT_TAG
 
 variables:
   DOCKER_HOST: tcp://docker:2376
@@ -60,14 +79,11 @@ variables:
   MAVEN_CLI_OPTS: >-
     --no-transfer-progress
     --errors
-    --fail-at-end
     --show-version
     --settings ci_settings.xml
-    -DinstallAtEnd=true
-    -DdeployAtEnd=true
     -Ddocker.repo=$CI_REGISTRY
     -Ddocker.tag=$IMAGE_TAG
-    -Ddocker.keycloak.image=$CI_REGISTRY/zeta/devops/ci-images/mirror/keycloak
+    -Ddocker.keycloak.image=$CI_REGISTRY/zeta/devops/keycloak
 
   MAVEN_OPTS: >-
     -Dstyle.color=always
@@ -81,6 +97,17 @@ variables:
   # NOTE: trailing slash is important
   TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/
   IMAGE_KEYCLOAK_CONFIG: $CI_REGISTRY/zeta/zeta-guard/keycloak-config-cli:main
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "pipeline"'
+    - when: never
 
 build:
   stage: build
@@ -98,6 +125,7 @@ build:
       else
         echo -e "[\\e[1;94mINFO\\e[0m] --- \\e[32mJaCoCo report(s) not found\\e[0m: skip"
       fi
+
   artifacts:
     when: always
     reports:
@@ -116,7 +144,7 @@ sbom:
   stage: build
   script:
     - |
-      mvn -P sbom cyclonedx:makeAggregateBom
+      mvn $MAVEN_CLI_OPTS -P sbom cyclonedx:makeAggregateBom
   artifacts:
     when: always
     paths:
@@ -129,11 +157,14 @@ mvn-sonar:
     paths:
       - ".m2/repository"
       - ".sonar/cache"
+  needs:
+    - job: build
+      artifacts: true
   rules:
-    # exclude if $SONAR_HOST_URL not set
-    - if: '($SONAR_HOST_URL == null || $SONAR_HOST_URL == "")'
-      when: never
-    #    - when: on_success
+    - if: '$SONAR_HOST_URL && $CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$SONAR_HOST_URL && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$SONAR_HOST_URL && $CI_COMMIT_TAG'
+    - if: '$SONAR_HOST_URL && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
     - when: never
   script:
     - >-
@@ -163,7 +194,7 @@ deploy:
 
     docker push "$IMAGE_NAME:$IMAGE_TAG"
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - !reference [ .rules_mr_default, rules ]
 
 release:
   variables:
@@ -179,7 +210,7 @@ release:
       deploy
     docker push "$IMAGE_NAME:$IMAGE_TAG"
   rules:
-    - if: $CI_COMMIT_TAG
+    - !reference [ .rules_tags, rules ]
 
 trigger_helm:
   stage: publish
@@ -187,7 +218,9 @@ trigger_helm:
     - job: deploy
       optional: true
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: $CI_COMMIT_TAG
+      when: never
+    - !reference [ .rules_mr_default, rules ]
   trigger:
     project: zeta/devops/zeta-guard-helm
     branch: main

@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ package de.gematik.zeta.zetaguard.keycloak.plugins.adminevents
 
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLog
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_HASH
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_MARKER
 import java.time.Instant
 import org.jboss.logging.Logger
 import org.keycloak.events.Event
@@ -36,16 +38,18 @@ import org.keycloak.util.JsonSerialization
 class AdminEventLoggerProvider(private val adminEventLogService: AdminEventLogStorageService) : EventListenerProvider {
   private val log: Logger = Logger.getLogger(AdminEventLoggerProvider::class.java)
 
-  override fun onEvent(event: Event) {}
-
-  /** Handles admin events and logs them to the database. */
+  /**
+   * Handles admin events and logs them to the database.
+   *
+   * Delegates to [AdminEventLogStorageService]
+   */
   override fun onEvent(adminEvent: AdminEvent, includeRepresentation: Boolean) {
     log.infof(
-        "Admin Event Occurred: realm=%s, operationType=%s, resourceType=%s, resourcePath=%s",
-        adminEvent.realmName,
-        adminEvent.operationType,
-        adminEvent.resourceType,
-        adminEvent.resourcePath,
+      "Admin Event Occurred: realm=%s, operationType=%s, resourceType=%s, resourcePath=%s",
+      adminEvent.realmName,
+      adminEvent.operationType,
+      adminEvent.resourceType,
+      adminEvent.resourcePath,
     )
 
     if (includeRepresentation) {
@@ -56,8 +60,15 @@ class AdminEventLoggerProvider(private val adminEventLogService: AdminEventLogSt
     val previousHash = adminEventLogService.previousHash()
     val createdAt = Instant.ofEpochMilli(adminEvent.time)
     val currentHash = calculateHash(json, createdAt, previousHash)
+    // Do not store genesis hash in DB, but keep in memory
+    val savedPreviousHash = if (GENESIS_HASH == previousHash) GENESIS_MARKER else previousHash
 
-    adminEventLogService.saveAdminEventLog(AdminEventLog(event = json, createdAt = createdAt, previousHash = previousHash, currentHash = currentHash))
+    adminEventLogService.saveAdminEventLog(
+      AdminEventLog(event = json, createdAt = createdAt, previousHash = savedPreviousHash, currentHash = currentHash))
+  }
+
+  override fun onEvent(event: Event) {
+    // No-op
   }
 
   override fun close() {

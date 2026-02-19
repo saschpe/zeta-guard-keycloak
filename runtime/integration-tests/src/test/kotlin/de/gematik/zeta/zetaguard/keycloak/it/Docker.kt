@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@
 
 package de.gematik.zeta.zetaguard.keycloak.it
 
-import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_PREVIOUS_HASH
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_HASH
 import java.io.File
 import java.time.Duration
 import kotlin.system.exitProcess
@@ -42,7 +42,7 @@ object Docker {
 
   private val docker: ComposeContainer =
       ComposeContainer(File("./docker-compose-it.yml"))
-          .withEnv("GENESIS_HASH", GENESIS_PREVIOUS_HASH)
+          .withEnv("GENESIS_HASH", GENESIS_HASH)
           .withLogConsumer("keycloak", Slf4jLogConsumer(log).withMdc("container", "keycloak"))
           .withLogConsumer("keycloak-db", Slf4jLogConsumer(log).withMdc("container", "keycloak-db"))
           .withLogConsumer("keycloak-config-cli", Slf4jLogConsumer(log).withMdc("container", "keycloak-config-cli"))

@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,51 +21,47 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  * #L%
  */
-package de.gematik.zeta.zetaguard.keycloak.commons
+package de.gematik.zeta.zetaguard.keycloak.client_assertion
 
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException
-import de.gematik.zeta.zetaguard.keycloak.commons.EncodingUtil.asMap
-import de.gematik.zeta.zetaguard.keycloak.commons.EncodingUtil.toJSON
-import de.gematik.zeta.zetaguard.keycloak.commons.EncodingUtil.toObject
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.AndroidZetaPlatformProductId
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.AppleZetaPlatformProductId
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.DISCRIMINATOR
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.LinuxZetaPlatformProductId
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.WindowsZetaPlatformProductId
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.ZetaGuardClientInstanceData
+import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.asMap
+import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.toJSON
+import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.toObject
+import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.maps.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldContainOnlyOnce
 import io.kotest.matchers.string.shouldNotContain
+import kotlin.collections.get
 
-class ZetaGuardClientInstanceDataTest : FunSpec() {
+class ClientInstanceDataTest : ZetaGuardFunSpec() {
   init {
     test("Serialize and deserialize polymorphic data") {
-      val android = AndroidZetaPlatformProductId("package", listOf("fingerprint"))
-      val apple = AppleZetaPlatformProductId("macos", listOf("bundle"))
-      val linux = LinuxZetaPlatformProductId("packaging", "app-id")
-      val windows = WindowsZetaPlatformProductId("store", "family")
+      val android = AndroidProductId("package", listOf("8214b94cd8c44024e7f65a8bbf221b51f617fa4818a30761c596aa5e34dc3359"))
+      val apple = AppleProductId("macos", listOf("bundle"))
+      val linux = LinuxProductId("packaging", "app-id")
+      val windows = WindowsProductId("store", "family")
       val platforms = mapOf("android" to android, "apple" to apple, "linux" to linux, "windows" to windows)
 
       platforms.forEach { platform ->
-        val data = ZetaGuardClientInstanceData("name", "client", "jens-id", "jens", "info@jens.de", 4711L, platform.value)
+        val data = ClientInstanceData("name", "client", "jens-id", "jens", "info@jens.de", 4711L, platform.value)
         val json = data.toJSON()
 
         json shouldContain "\"name\":\"name\""
         json shouldContain "\"owner_mail\":\"info@jens.de\""
-        json shouldContain "\"$DISCRIMINATOR\":\"${platform.key}\""
+        json shouldContainOnlyOnce "\"$PROPERTY_PLATFORM_DISCRIMINATOR\":\"${platform.key}\""
         json shouldNotContain "@type"
 
-        val clientInstanceData = json.toObject<ZetaGuardClientInstanceData>()
+        val clientInstanceData = json.toObject<ClientInstanceData>()
         clientInstanceData shouldBe data
       }
     }
 
     test("Conversion from/to map") {
-      val android = AndroidZetaPlatformProductId("package", listOf("fingerprint"))
-      val data = ZetaGuardClientInstanceData("name", "client", "jens-id", "jens", "info@jens.de", 4711L, android)
+      val android = AndroidProductId("package", listOf("fingerprint"))
+      val data = ClientInstanceData("name", "client", "jens-id", "jens", "info@jens.de", 4711L, android)
       val asMap = data.asMap()
 
       asMap shouldContain ("owner_mail" to "info@jens.de")
@@ -73,9 +69,9 @@ class ZetaGuardClientInstanceDataTest : FunSpec() {
 
       val platform = asMap["platform_product_id"] as Map<*, *>
       platform["@type"] shouldBe null
-      platform[DISCRIMINATOR] shouldBe "android"
+      platform[PROPERTY_PLATFORM_DISCRIMINATOR] shouldBe "android"
 
-      asMap.toObject<ZetaGuardClientInstanceData>() shouldBe data
+      asMap.toObject<ClientInstanceData>() shouldBe data
     }
 
     test("Broken platform") {
@@ -89,13 +85,13 @@ class ZetaGuardClientInstanceDataTest : FunSpec() {
             "owner_mail": "info@jens.de",
             "registration_timestamp": 4711,
             "platform_product_id": {
-              "$DISCRIMINATOR": "jens"
+              "$PROPERTY_PLATFORM_DISCRIMINATOR": "jens"
             }
           }
           """
               .trimIndent()
 
-      shouldThrow<InvalidTypeIdException> { json.toObject<ZetaGuardClientInstanceData>() }
+      shouldThrow<InvalidTypeIdException> { json.toObject<ClientInstanceData>() }
     }
   }
 }

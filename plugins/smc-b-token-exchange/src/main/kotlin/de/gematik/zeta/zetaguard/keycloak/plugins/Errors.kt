@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,8 +45,14 @@ internal fun exchangeError(throwable: Throwable, error: String = "token_exchange
 
 internal fun invalidToken(reason: String) = KeycloakValidationError(INVALID_TOKEN, reason, BAD_REQUEST)
 
-internal fun invalidClientSelfAssessment(reason: String) =
-    KeycloakValidationError(INVALID_TOKEN, "Invalid or missing client self assessment: $reason", BAD_REQUEST)
+internal fun invalidClientClaim(reason: String) =
+    KeycloakValidationError(INVALID_TOKEN, "Invalid or missing client claim: $reason", BAD_REQUEST)
+
+internal fun invalidClientAttestation(reason: String) =
+    KeycloakValidationError(INVALID_TOKEN, "Client attestation failed: $reason", BAD_REQUEST)
+
+internal fun invalidClientPublicKey(reason: String) =
+    KeycloakValidationError(INVALID_TOKEN, "Cannot verify client public key: $reason", BAD_REQUEST)
 
 internal fun missingClientState() = KeycloakValidationError(INVALID_CLIENT, "Missing client attestation state", BAD_REQUEST)
 

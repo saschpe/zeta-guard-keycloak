@@ -4,12 +4,14 @@
     <servers>
         <server>
             <id>azdo-maven-mirror</id>
+
             <username>${env.AZDO_MAVEN_USERNAME}</username>
             <password>${env.AZDO_MAVEN_PAT}</password>
         </server>
 
         <server>
             <id>gitlab</id>
+
             <configuration>
                 <httpHeaders>
                     <property>
@@ -37,7 +39,7 @@
             <repositories>
                 <repository>
                     <id>gitlab</id>
-                    <url>${env.CI_API_V4_URL}/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+                    <url>${env.CI_API_V4_URL}/groups/8/-/packages/maven</url>
                     <releases>
                         <enabled>true</enabled>
                         <updatePolicy>never</updatePolicy>
@@ -53,7 +55,7 @@
             <pluginRepositories>
                 <pluginRepository>
                     <id>gitlab</id>
-                    <url>${env.CI_API_V4_URL}/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+                    <url>${env.CI_API_V4_URL}/groups/8/-/packages/maven</url>
 
                     <releases>
                         <enabled>true</enabled>

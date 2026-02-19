@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@
 package de.gematik.zeta.zetaguard.keycloak.plugins.adminevents
 
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLog
-import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_PREVIOUS_HASH
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_MARKER
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_HASH
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 
@@ -55,7 +56,7 @@ class AdminEventLoggerTest : AbstractAdminEventLoggerTest() {
 
       test("Hash chain persistence") {
         adminEventLogStorageService.findAll() shouldBe emptyList()
-        adminEventLogStorageService.previousHash() shouldBe GENESIS_PREVIOUS_HASH
+        adminEventLogStorageService.previousHash() shouldBe GENESIS_HASH
 
         eventLogger.onEvent(adminEvent1, true)
 
@@ -63,7 +64,7 @@ class AdminEventLoggerTest : AbstractAdminEventLoggerTest() {
         logs1.size shouldBe 1
 
         val log1 = logs1.first()
-        log1.previousHash shouldBe GENESIS_PREVIOUS_HASH
+        log1.previousHash shouldBe GENESIS_MARKER
 
         adminEventLogStorageService.previousHash() shouldBe log1.currentHash
 

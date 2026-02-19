@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,9 +25,6 @@ package de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage
 
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ENV_GENESIS_HASH
 import jakarta.persistence.EntityManager
-import java.lang.System.getenv
-import java.util.UUID
-import org.jboss.logging.Logger
 import org.keycloak.connections.jpa.JpaConnectionProvider
 import org.keycloak.models.KeycloakSession
 
@@ -40,6 +37,8 @@ class DefaultEMCreator(private val keycloakSession: KeycloakSession) : EntityMan
 /**
  * Service for managing admin event logs in the Keycloak database.
  *
+ * https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_26269
+ *
  * This service provides methods to retrieve the previous hash, find all admin event logs, and save new admin event log entries.
  *
  * @property emCreator A lambda that provides an [EntityManager] instance for database operations.
@@ -47,21 +46,25 @@ class DefaultEMCreator(private val keycloakSession: KeycloakSession) : EntityMan
 class AdminEventLogStorageService(emCreator: EntityManagerCreator) {
   private val entityManager by lazy { emCreator.invoke() }
 
-  /** Retrieves the previous hash from the most recent admin event log entry. If no entries exist, it returns a predefined genesis hash. */
+  /**
+   * Retrieves the previous hash from the most recent admin event log entry.
+   *
+   * If no entries exist, it returns a genesis hash from memory.
+   */
   fun previousHash(): String =
-      entityManager
-          .createQuery("SELECT a.currentHash FROM AdminEventLog a ORDER BY a.createdAt DESC", String::class.java)
-          .setMaxResults(1)
-          .resultList
-          .firstOrNull() ?: GENESIS_PREVIOUS_HASH
+    entityManager
+      .createQuery("SELECT a.currentHash FROM AdminEventLog a ORDER BY a.createdAt DESC", String::class.java)
+      .setMaxResults(1)
+      .resultList
+      .firstOrNull() ?: GENESIS_HASH
 
   /**
-   * Retrieves all admin event logs in historical order, i.e., from the oldest to the newest.
+   * Retrieves all admin event logs in historical order, i.e., from the oldest to the latest.
    *
    * This method is used to fetch the complete history of admin events.
    */
   fun findAll(): List<AdminEventLog> =
-      entityManager.createQuery("SELECT a FROM AdminEventLog a ORDER BY a.createdAt ASC", AdminEventLog::class.java).resultList
+    entityManager.createQuery("SELECT a FROM AdminEventLog a ORDER BY a.createdAt ASC", AdminEventLog::class.java).resultList
 
   fun saveAdminEventLog(adminEventLog: AdminEventLog) {
     entityManager.persist(adminEventLog)
@@ -69,19 +72,10 @@ class AdminEventLogStorageService(emCreator: EntityManagerCreator) {
   }
 
   companion object {
-    @JvmStatic private val log = Logger.getLogger(AdminEventLogStorageService::class.java)
-
-    @JvmStatic val GENESIS_PREVIOUS_HASH = getGenesisHash()
-
-    private fun getGenesisHash(): String {
-      var hash: String? = getenv(ENV_GENESIS_HASH)
-
-      if (hash == null) {
-        log.warn("Environment variable »$ENV_GENESIS_HASH« not set, creating a new initial hash")
-        hash = (UUID.randomUUID().toString() + UUID.randomUUID()).replace("-", "")
-      }
-
-      return hash
+    const val GENESIS_MARKER = ENV_GENESIS_HASH
+    val GENESIS_HASH: String by lazy {
+        System.getenv(ENV_GENESIS_HASH)
+            ?: throw IllegalStateException("Environment variable »$ENV_GENESIS_HASH« not set")
     }
   }
 }

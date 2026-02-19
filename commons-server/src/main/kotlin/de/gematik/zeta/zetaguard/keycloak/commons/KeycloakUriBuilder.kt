@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,9 +68,9 @@ class KeycloakUriBuilder(private val uriBuilder: UriBuilder) {
 }
 
 /**
- * Omit mentioning port, if defaults apply
+ * Omit port from uri, if defaults apply
  *
- * "audiences" may not match anymore, otherwise
+ * Otherwise "audience" claims, e.g. may not match anymore
  */
 private fun mapPort(port: Int, scheme: String): Int =
     when (port) {

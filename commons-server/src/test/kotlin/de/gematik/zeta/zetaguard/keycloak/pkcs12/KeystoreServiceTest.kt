@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,15 +23,14 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.pkcs12
 
+import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
 import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_INTERMEDIATE
 import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF
 import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_ROOT
 import de.gematik.zeta.zetaguard.keycloak.commons.server.getPublicKey
 import de.gematik.zeta.zetaguard.keycloak.commons.server.isIntermediate
 import de.gematik.zeta.zetaguard.keycloak.commons.server.isRoot
-import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -42,7 +41,7 @@ import java.security.SignatureException
 
 const val KEYSTORE_PASSWORD = "tyqvHpFoHdu68yRE+0F4q/I"
 
-class KeystoreServiceTest : FunSpec() {
+class KeystoreServiceTest : ZetaGuardFunSpec() {
   init {
     val certificate = objectUnderTest.getCertificate(CRT_GEMATIK_INTERMEDIATE)
     val leaf = objectUnderTest.getCertificate(CRT_GEMATIK_LEAF)
@@ -91,10 +90,6 @@ class KeystoreServiceTest : FunSpec() {
   }
 
   companion object {
-    init {
-      setupBouncyCastle()
-    }
-
     private val stream = KeystoreServiceTest::class.java.getResourceAsStream("/smcb-certificates.p12")!!
     val objectUnderTest = KeystoreService(stream, KEYSTORE_PASSWORD)
 

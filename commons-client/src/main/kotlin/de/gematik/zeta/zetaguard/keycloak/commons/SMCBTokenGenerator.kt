@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,12 +25,22 @@
 
 package de.gematik.zeta.zetaguard.keycloak.commons
 
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.ClientInstanceData
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.ClientStatementData
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.LinuxProductId
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.Platform
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.PostureType
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.ProductId
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.SoftwarePosture
+import de.gematik.zeta.zetaguard.keycloak.client_attestation.AttestationUtil
 import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGenerator.buildCertificate
-import de.gematik.zeta.zetaguard.keycloak.commons.PKIUtil.generateECKeyPair
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.LinuxZetaPlatformProductId
-import de.gematik.zeta.zetaguard.keycloak.commons.client_assertion.ZetaGuardClientInstanceData
 import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_CLIENT_SELF_ASSESSMENT
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_CLIENT_STATEMENT
+import de.gematik.zeta.zetaguard.keycloak.commons.server.PKIData
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
+import de.gematik.zeta.zetaguard.keycloak.commons.server.createSignerContext
+import de.gematik.zeta.zetaguard.keycloak.commons.server.fromBase64
+import de.gematik.zeta.zetaguard.keycloak.commons.server.generateKeyPair
 import jakarta.ws.rs.HttpMethod
 import java.net.URI
 import java.security.KeyPair
@@ -53,40 +63,44 @@ import org.keycloak.util.TokenUtil.TOKEN_TYPE_BEARER
 const val DN_GEMATIK = "CN=GEM.SMC-B,OU=Institution des Gesundheitswesens-CA der Telematikinfrastruktur,O=gematik GmbH,C=DE"
 const val DN_PRAXIS = "CN=Praxis Dr. Eisenbart,STREET=Goethestr. 5,L=Essen,ST=Nordrhein-Westfalen,C=DE"
 
-class SMCBTokenGenerator(issuerKeypair: KeyPair = generateECKeyPair(), val subjectKeyPair: KeyPair = generateECKeyPair()) {
-  val keys = ECKeys(subjectKeyPair)
+class SMCBTokenGenerator(issuerKeypair: KeyPair = generateKeyPair(), val subjectKeyPair: KeyPair = generateKeyPair()) {
+  val keys = PKIData(subjectKeyPair)
   val certificate =
-      buildCertificate(subjectName = DN_PRAXIS, subjectKeyPair = subjectKeyPair, issuerName = DN_GEMATIK, issuerKeyPair = issuerKeypair, isCA = false)
+    buildCertificate(subjectName = DN_PRAXIS, subjectKeyPair = subjectKeyPair, issuerName = DN_GEMATIK, issuerKeyPair = issuerKeypair, isCA = false)
 
-  fun generateClientAssertion(client: OIDCClientRepresentation): String {
+  fun generateClientAssertion(client: OIDCClientRepresentation, nonceString: String): String {
     val registrationAccessToken = client.registrationAccessToken.toAccessToken()
     val clientId = client.clientId
     val audiences = registrationAccessToken.audience.toList()
 
-    return generateClientAssertion(clientId, audiences)
+    return generateClientAssertion(clientId, audiences, nonceString)
   }
 
-  fun generateClientAssertion(clientId: String, audiences: List<String>, otherClaims: Map<String, Any> = createOtherClaims(clientId)): String =
-      generateSMCBToken(issuer = clientId, subject = clientId, audiences = audiences, certificateChain = listOf(), otherClaims = otherClaims)
+  fun generateClientAssertion(
+    clientId: String,
+    audiences: List<String>,
+    nonceString: String,
+    otherClaims: Map<String, Any> = createOtherClaims(clientId, nonceString, keys)
+  ): String = generateSMCBToken(issuer = clientId, subject = clientId, audiences = audiences, certificateChain = listOf(), otherClaims = otherClaims)
 
   /**
    * Generate DPoP, see https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#5.5.2.5.1
    *
    * Inspired by [DPoPGenerator.generateRsaSignedDPoPProof]
    */
-  fun generateDPoPToken(keys: ECKeys, httpMethod: String = HttpMethod.POST, endpointURL: URI, accessToken: String): String {
+  fun generateDPoPToken(keys: PKIData, httpMethod: String = HttpMethod.POST, endpointURL: URI, accessToken: String): String {
     val jwsRsaHeader = JWSHeader(DPOP_DEFAULT_ALGORITHM, DPOP_JWT_HEADER_TYPE, keys.jwk.keyId, keys.jwk)
 
     return DPoPGenerator()
-        .generateSignedDPoPProof(
-            SecretGenerator.getInstance().generateSecureID(),
-            httpMethod,
-            endpointURL.toString(),
-            currentTime().toLong(),
-            jwsRsaHeader,
-            keys.keypair.private,
-            accessToken,
-        )
+      .generateSignedDPoPProof(
+        SecretGenerator.getInstance().generateSecureID(),
+        httpMethod,
+        endpointURL.toString(),
+        currentTime().toLong(),
+        jwsRsaHeader,
+        keys.keypair.private,
+        accessToken,
+      )
   }
 
   /**
@@ -95,47 +109,56 @@ class SMCBTokenGenerator(issuerKeypair: KeyPair = generateECKeyPair(), val subje
    * According to https://github.com/gematik/zeta/blob/main/src/schemas/smb-id-token-jwt.yaml
    */
   fun generateSMCBToken(
-      issuer: String = ZETA_CLIENT,
-      subject: String = TELEMATIK_ID,
-      nonceString: String = "noncence",
-      issuedFor: String = CLIENT_C_ID, // target client
-      audiences: List<String> = listOf(ZETA_CLIENT),
-      certificateChain: List<X509Certificate> = listOf(certificate),
-      otherClaims: Map<String, Any> = createOtherClaims(issuer),
+    issuer: String = ZETA_CLIENT,
+    subject: String = TELEMATIK_ID,
+    nonceString: String = "noncence",
+    issuedFor: String = CLIENT_C_ID, // target client
+    audiences: List<String> = listOf(ZETA_CLIENT),
+    certificateChain: List<X509Certificate> = listOf(certificate),
+    otherClaims: Map<String, Any> = createOtherClaims(issuer, nonceString, keys),
   ): String {
     val signer = subjectKeyPair.createSignerContext()
 
     return JWSBuilder()
-        .type(OAuth2Constants.JWT)
-        .x5c(certificateChain)
-        .jsonContent(
-            IDToken().apply {
-              id(UUID.randomUUID().toString())
-              type(TOKEN_TYPE_BEARER)
-              issuer(issuer)
-              issuedFor(issuedFor)
-              subject(subject)
-              audience(*audiences.toTypedArray())
-              expirationDate(Duration.ofDays(10))
-              issuedNow()
-              otherClaims.forEach { setOtherClaims(it.key, it.value) }
-              nonce = nonceString
-            }
-        )
-        .sign(signer)
+      .type(OAuth2Constants.JWT)
+      .x5c(certificateChain)
+      .jsonContent(
+        IDToken().apply {
+          id(UUID.randomUUID().toString())
+          type(TOKEN_TYPE_BEARER)
+          issuer(issuer)
+          issuedFor(issuedFor)
+          subject(subject)
+          audience(*audiences.toTypedArray())
+          expirationDate(Duration.ofDays(10))
+          issuedNow()
+          otherClaims.forEach { setOtherClaims(it.key, it.value) }
+          nonce = nonceString
+        })
+      .sign(signer)
   }
 }
 
-// Implement https://ey-fp-dev.atlassian.net/browse/ZETAP-774
-fun createClientData(clientId: String, mail: String = "info@acme.de") =
-    ZetaGuardClientInstanceData(
-        "name",
-        clientId,
-        "acme-id",
-        "Acme Inc.",
-        mail,
-        System.currentTimeMillis() / 1000,
-        LinuxZetaPlatformProductId("packaging", "app-id"),
-    )
+val platformProductId = LinuxProductId("packaging", "app-id")
 
-fun createOtherClaims(clientId: String) = mapOf(CLAIM_CLIENT_SELF_ASSESSMENT to createClientData(clientId))
+// Implement https://ey-fp-dev.atlassian.net/browse/ZETAP-774
+fun clientInstanceData(clientId: String, mail: String = "info@acme.de") =
+  ClientInstanceData("name", clientId, "acme-id", "Acme Inc.", mail, timeStampSeconds(), platformProductId)
+
+// Implement https://ey-fp-dev.atlassian.net/browse/ZETAP-794
+fun clientStatementData(clientId: String, nonceString: String, pkidata: PKIData, productId: ProductId = platformProductId, timeStampSeconds: Long = timeStampSeconds()): ClientStatementData {
+  val nonceBytes = nonceString.fromBase64()
+  val attestationChallenge = AttestationUtil.calculateAttestationChallenge(
+      pkidata.jwkThumbPrint,
+      nonceBytes
+  )
+  val softwarePosture =
+    SoftwarePosture(productId, "demo_client", "0.2.0", "Linux", "6.12.54-linuxkit", "aarch64", pkidata.publicKeyPEM, attestationChallenge)
+
+  return ClientStatementData(clientId, Platform.LINUX, PostureType.SOFTWARE, softwarePosture, timeStampSeconds)
+}
+
+private fun timeStampSeconds(): Long = System.currentTimeMillis() / 1000
+
+fun createOtherClaims(clientId: String, nonceString: String, pkidata: PKIData) =
+  mapOf(CLAIM_CLIENT_SELF_ASSESSMENT to clientInstanceData(clientId), CLAIM_CLIENT_STATEMENT to clientStatementData(clientId, nonceString, pkidata))

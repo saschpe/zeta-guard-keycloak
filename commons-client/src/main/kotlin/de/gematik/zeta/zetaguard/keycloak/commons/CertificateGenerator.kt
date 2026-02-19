@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import de.gematik.zeta.zetaguard.keycloak.commons.server.BETRIEBSSTAETTE_ARZT
 import de.gematik.zeta.zetaguard.keycloak.commons.server.admission
 import de.gematik.zeta.zetaguard.keycloak.commons.server.betriebsstaetteArzt
 import de.gematik.zeta.zetaguard.keycloak.commons.server.gematikPolicy
+import de.gematik.zeta.zetaguard.keycloak.commons.server.signingAlgorithm
 import de.gematik.zeta.zetaguard.keycloak.commons.server.smcbAuth
 import java.math.BigInteger
 import java.security.KeyPair
@@ -59,19 +60,21 @@ import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 
+/**
+ * Build a single X.509 Certificate optionally signed by another X.509 Certificate.
+ *
+ * Format and extensions are created according to https://gemspec.gematik.de/docs/gemSpec/gemSpec_PKI/latest/#4.7.2.1
+ */
 object CertificateGenerator {
-  /**
-   * Build a single X.509 Certificate optionally signed by another X.509 Certificate. Format and fields are created according to
-   * https://gemspec.gematik.de/docs/gemSpec/gemSpec_PKI/latest/#4.7.2.1
-   */
   fun buildCertificate(
-      subjectName: String,
-      subjectKeyPair: KeyPair,
-      issuerName: String,
-      issuerKeyPair: KeyPair,
-      isCA: Boolean,
-      isRootCA: Boolean = false,
-      sans: List<GeneralName>? = null,
+    subjectName: String,
+    subjectKeyPair: KeyPair,
+    issuerName: String,
+    issuerKeyPair: KeyPair,
+    isCA: Boolean,
+    isRootCA: Boolean = false,
+    createAdmissionExtension: Boolean = true,
+    sans: List<GeneralName>? = null,
   ): X509Certificate {
     val certBuilder = createCertificateBuilder(subjectName, issuerName, subjectKeyPair.public)
     val extUtils = JcaX509ExtensionUtils()
@@ -101,12 +104,14 @@ object CertificateGenerator {
       certBuilder.addExtension(Extension.extendedKeyUsage, false, eku)
 
       // Admissions containing Profession OIDs
-      val admissionSyntax = buildAdmissionSyntax()
-      certBuilder.addExtension(admission, false, admissionSyntax)
+      if (createAdmissionExtension) {
+        val admissionSyntax = buildAdmissionSyntax()
+        certBuilder.addExtension(admission, false, admissionSyntax)
 
-      // Certificate policies reference
-      val certificatePolicies = buildCertificatePolicies()
-      certBuilder.addExtension(Extension.certificatePolicies, false, certificatePolicies)
+        // Certificate policies reference
+        val certificatePolicies = buildCertificatePolicies()
+        certBuilder.addExtension(Extension.certificatePolicies, false, certificatePolicies)
+      }
 
       // Subject Alternative Names (SANs)
       if (!sans.isNullOrEmpty()) {
@@ -137,12 +142,6 @@ object CertificateGenerator {
   }
 
   private fun buildAdmissionSyntax(): AdmissionSyntax {
-    //    val namingAuthority =
-    //      NamingAuthority(
-    //        ASN1ObjectIdentifier("1.2.276.0.76.4.58"),
-    //        "https://gemspec.gematik.de/downloads/gemSpec/gemSpec_OID",
-    //        DirectoryString("gematik GmbH"),
-    //      )
     val professionInfo = ProfessionInfo(null, arrayOf(DirectoryString(BETRIEBSSTAETTE_ARZT)), arrayOf(betriebsstaetteArzt), TELEMATIK_ID, null)
 
     // Per RFC 5755, admissionAuthority in AdmissionSyntax and Admissions

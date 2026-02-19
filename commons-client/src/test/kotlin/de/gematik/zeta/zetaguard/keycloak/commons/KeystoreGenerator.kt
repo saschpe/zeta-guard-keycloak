@@ -2,7 +2,7 @@
  * #%L
  * keycloak-zeta
  * %%
- * (C) akquinet tech@Spree GmbH, 2025, licensed for gematik GmbH
+ * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.commons
 
-import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGeneratorTest.Companion.intermediateCert
-import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGeneratorTest.Companion.leafCert
-import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGeneratorTest.Companion.leafKeyPair
-import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGeneratorTest.Companion.rootCert
 import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_INTERMEDIATE
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_INTERMEDIATE_DN
 import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF_DN
 import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_ROOT
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_ROOT_DN
+import de.gematik.zeta.zetaguard.keycloak.commons.server.EC_CURVE_P256
 import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
 import de.gematik.zeta.zetaguard.keycloak.pkcs12.KEYSTORE_PASSWORD
 import java.io.File
@@ -37,14 +37,26 @@ import java.security.KeyStore
 import org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
 import org.keycloak.common.util.KeystoreUtil.KeystoreFormat.PKCS12
 
+@Suppress("ReplaceSizeCheckWithIsNotEmpty")
 fun main(@Suppress("unused") args: Array<String>) {
   setupBouncyCastle()
+
+  val password = if (args.size > 0) args[0] else KEYSTORE_PASSWORD
+  val rootCertName = if (args.size > 1) args[1] else CRT_GEMATIK_ROOT
+  val intermediateCertName = if (args.size > 2) args[2] else CRT_GEMATIK_INTERMEDIATE
+  val leafCertName = if (args.size > 3) args[3] else CRT_GEMATIK_LEAF
+  val rootCertDN = if (args.size > 4) args[4] else CRT_GEMATIK_ROOT_DN
+  val intermediateCertDN = if (args.size > 5) args[5] else CRT_GEMATIK_INTERMEDIATE_DN
+  val leafCertDN = if (args.size > 6) args[6] else CRT_GEMATIK_LEAF_DN
+
   val keyStore = KeyStore.getInstance(PKCS12.name, PROVIDER_NAME).apply { load(null) }
+  val certificateChain = CertificateChain(EC_CURVE_P256, rootCertDN, intermediateCertDN, leafCertDN)
 
-  keyStore.setCertificateEntry(CRT_GEMATIK_ROOT, rootCert)
-  keyStore.setCertificateEntry(CRT_GEMATIK_INTERMEDIATE, intermediateCert)
-  keyStore.setCertificateEntry(CRT_GEMATIK_LEAF, leafCert)
-  keyStore.setKeyEntry(CRT_GEMATIK_LEAF, leafKeyPair.private, KEYSTORE_PASSWORD.toCharArray(), arrayOf(leafCert, intermediateCert, rootCert))
-
-  keyStore.store(File("smcb-certificates.p12").outputStream(), KEYSTORE_PASSWORD.toCharArray())
+  with(certificateChain) {
+    keyStore.setCertificateEntry(rootCertName, rootCert)
+    keyStore.setCertificateEntry(intermediateCertName, intermediateCert)
+    keyStore.setCertificateEntry(leafCertName, leafCert)
+    keyStore.setKeyEntry(leafCertName, leafKeyPair.private, password.toCharArray(), arrayOf(leafCert, intermediateCert, rootCert))
+  }
+  keyStore.store(File("certificates.p12").outputStream(), password.toCharArray())
 }
