@@ -2,6 +2,35 @@
 
 # Release Notes ZETA PDP
 
+## Release 0.4.1
+
+### changed:
+- Keycloak upgraded to 26.5.6
+- Improved OPA decision client logging and error handling
+- Improve certificate lookup performance
+
+## removed
+
+## Release 0.4.0
+
+### added:
+- TPM attestation validation
+- refresh token grant type `grant_type=refresh_token`
+- extended access token claims
+- OPA simulation instance support
+- ENV-VARs
+  - `SMCB_HASHING_PEPPER` — **required**; pepper for Telematik-ID hashing
+  - `OPA_SIMULATION_BASE_URL` — **optional**; URL of the shadow OPA instance
+
+### changed:
+- **BREAKING** Telematik-ID no longer stored as username
+- Keycloak upgraded to 26.5.5 (official release)
+- authorization failures return `403` instead of `400`
+- audience claim (`aud`) handling corrected
+
+## removed
+- `CHECK_CLIENT_ATTESTATION_ENABLED` for client software attestation has been removed. Attestation verification is now always enforced.
+
 ## Release 0.3.2
 
 > [!IMPORTANT]  

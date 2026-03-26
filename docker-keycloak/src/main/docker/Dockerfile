@@ -9,6 +9,14 @@ WORKDIR /opt/keycloak
 
 COPY maven/providers/*.jar providers/
 
+# Provide default certificates for TPM-based authentication
+COPY maven/ms-tpm-certificates.p12 conf/
+
+COPY maven/startup.sh bin/
+
+# Effectively an optional COPY through wildcard and activated maven profile
+COPY maven/${async.profiler}-* /opt/keycloak/${async.profiler}
+
 RUN /opt/keycloak/bin/kc.sh build
 
 # Keycloak runtime
@@ -16,8 +24,7 @@ FROM ${docker.keycloak.image}:${keycloak.version}
 COPY --from=builder --chown=1000:1000 /opt/keycloak/ /opt/keycloak/
 
 USER root
-RUN chown -R 1000:1000 /opt/keycloak \
-    && chmod -R g=u /opt/keycloak
+RUN chown -R 1000:1000 /opt/keycloak && chmod -R g=u /opt/keycloak && chmod 755 /opt/keycloak/bin/*.sh /opt/keycloak/${async.profiler}/bin/*
 
 ENV TZ=Europe/Berlin
 
@@ -29,4 +36,4 @@ COPY maven/java.security /etc/alternatives/jre/conf/security/
 
 USER keycloak
 
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
+ENTRYPOINT ["/opt/keycloak/bin/startup.sh"]

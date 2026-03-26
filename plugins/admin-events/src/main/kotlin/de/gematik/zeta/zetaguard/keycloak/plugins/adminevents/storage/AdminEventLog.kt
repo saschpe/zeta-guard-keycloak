@@ -25,13 +25,11 @@ package de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.GeneratedValue
 import jakarta.persistence.Id
 import jakarta.persistence.Lob
 import jakarta.persistence.Table
 import java.time.Instant
 import java.util.Objects
-import java.util.UUID
 import org.apache.commons.lang3.builder.ToStringBuilder
 import org.apache.commons.lang3.builder.ToStringStyle.NO_FIELD_NAMES_STYLE
 
@@ -48,7 +46,7 @@ import org.apache.commons.lang3.builder.ToStringStyle.NO_FIELD_NAMES_STYLE
 @Entity
 @Table(name = "admin_event_log")
 class AdminEventLog(
-    @Id @GeneratedValue @Column(name = "id", nullable = false, updatable = false) val id: UUID? = null,
+    @Id @Column(name = "id", nullable = false, updatable = false, length = 36) val id: String? = null,
     @Column(name = "created_at", nullable = false) val createdAt: Instant,
     @Lob @Column(name = "event_data", nullable = false) val event: String,
     @Column(name = "previous_hash", nullable = false, length = 64, unique = true) val previousHash: String,

@@ -5,13 +5,13 @@
     <parent>
         <groupId>de.gematik.zeta.zeta-guard</groupId>
         <artifactId>keycloak-zeta</artifactId>
-        <version>0.3.2</version>
+        <version>0.4.1</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>client-registration</artifactId>
-    <name>𝝵-Guard :: Setup new clients</name>
+    <name>𝝵-Guard :: Register new SMC-B clients</name>
     <description>Setup newly created 𝝵-Guard clients</description>
 
     <dependencies>

@@ -59,6 +59,19 @@ class OpaConfigResolverTest :
         cfg.readTimeoutMs shouldBe 4444
         cfg.failClosed shouldBe true
       }
+
+      "fromScope resolves simulation base url and normalize trims trailing slash" {
+        val prefix = "spi-token-exchange-provider-$ZETAGUARD_TOKEN_EXCHANGE_PROVIDER_ID-"
+        val scope =
+            dummyScope(
+                mapOf(
+                    prefix + "opa-simulation-base-url" to " http://opa-simulation:8181/ ",
+                )
+            )
+
+        val cfg = OpaConfigResolver.normalize(OpaConfigResolver.fromScope(scope))
+        cfg.simulationBaseUrl shouldBe "http://opa-simulation:8181"
+      }
     })
 
 private fun dummyScope(values: Map<String, String>): Config.Scope =

@@ -31,6 +31,7 @@ import org.keycloak.OAuth2Constants.TOKEN_EXCHANGE_GRANT_TYPE
 
 const val ATTRIBUTE_SMCB_CONTEXT = "zetaguard.smcbContext"
 const val ATTRIBUTE_CLIENT_ASSESSMENT_DATA = "zetaguard.clientData"
+const val ATTRIBUTE_CLIENT_STATEMENT_DATA = "zetaguard.clientStatement"
 
 const val ATTRIBUTE_SMCBUSER_CLIENT_IDS = "zetaguard.smcbuser.client_ids"
 const val ATTRIBUTE_SMCBUSER_TELEMATIK_ID = "zetaguard.smcbuser.telematik_id"
@@ -43,7 +44,14 @@ const val ATTRIBUTE_CREATED_AT = "zeta-guard.client.created_at"
 
 const val CLAIM_CLIENT_SELF_ASSESSMENT = "urn:telematik:client-self-assessment"
 const val CLAIM_CLIENT_STATEMENT = "client_statement"
-const val CLAIM_ACCESS_TOKEN_CLIENT_DATA = "cdat"
+const val CLAIM_PROFESSION_OID = "profession_oid"
+const val CLAIM_COMMON_NAME = "common_name"
+const val CLAIM_ORGANIZATION_NAME = "organization_name"
+const val CLAIM_PLATFORM = "platform"
+const val CLAIM_PRODUCT_ID = "product_id"
+const val CLAIM_CLIENT_ID = "client_id"
+const val CLAIM_PRODUCT_VERSION = "product_version"
+const val CLAIM_IP_ADDRESS = "ip_address"
 
 const val ZETA_REALM = "zeta-guard"
 const val ZETA_CLIENT = "zeta-client"
@@ -65,6 +73,9 @@ const val SMCB_IDENTITY_PROVIDER_ID = "zeta-smc-b-oidc"
 const val ENV_SMCB_KEYSTORE_LOCATION = "SMCB_KEYSTORE_LOCATION"
 const val ENV_SMCB_KEYSTORE_PASSWORD = "SMCB_KEYSTORE_PASSWORD"
 
+const val ENV_TPM_KEYSTORE_LOCATION = "TPM_KEYSTORE_LOCATION"
+const val ENV_TPM_KEYSTORE_PASSWORD = "TPM_KEYSTORE_PASSWORD"
+
 const val ADMIN_EVENTS_PROVIDER_ID = "zeta-guard-admin-events"
 const val ENV_GENESIS_HASH = "GENESIS_HASH"
 
@@ -77,6 +88,7 @@ const val WELLKNOWN_PROVIDER_ID = "zeta-guard-well-known"
 const val ENV_SERVICE_DOCUMENTATION_URI = "SERVICE_DOCUMENTATION_URL"
 
 const val ENV_MAX_CLIENTS = "SMCB_USER_MAX_CLIENTS"
+const val ENV_HASHING_PEPPER = "SMCB_HASHING_PEPPER"
 
 const val CLIENT_REGISTRATION_POLICY_PROVIDER_ID = "zeta-client-registration-policy"
 const val ENV_CLIENT_REGISTRATION_TTL = "CLIENT_REGISTRATION_TTL"

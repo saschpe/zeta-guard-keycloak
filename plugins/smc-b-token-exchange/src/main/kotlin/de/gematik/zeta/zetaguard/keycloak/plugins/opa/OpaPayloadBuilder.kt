@@ -37,20 +37,20 @@ object OpaPayloadBuilder {
   )
 
   fun build(params: PayloadParams): String {
-    val userInfo = params.professionOid?.takeIf { it.isNotBlank() }?.let { OpaInput.UserInfo(professionOID = it) }
+    val userInfo = params.professionOid?.takeIf { it.isNotBlank() }?.let { OpaInput.OpaUserInfo(professionOID = it) }
     val posture =
         if (!params.productId.isNullOrBlank() && !params.productVersion.isNullOrBlank()) {
-          OpaInput.Posture(productId = params.productId, productVersion = params.productVersion)
+          OpaInput.OpaPosture(productId = params.productId, productVersion = params.productVersion)
         } else null
-    val clientAssertion = posture?.let { OpaInput.ClientAssertion(posture = it) }
+    val clientAssertion = posture?.let { OpaInput.OpaClientAssertion(posture = it) }
     val effectiveAud = params.audiences?.map { it.trim() }?.filter { it.isNotBlank() }?.ifEmpty { null }
 
     val input =
         OpaInput.Input(
             authorizationRequest =
-                OpaInput.AuthorizationRequest(
+                OpaInput.OpaAuthorizationRequest(
                     scopes = params.scopes.ifEmpty { null },
-                    aud = effectiveAud,
+                    audience = effectiveAud,
                     grantType = params.grantType?.takeIf { it.isNotBlank() },
                     ipAddress = params.ipAddress?.takeIf { it.isNotBlank() },
                 ),

@@ -25,21 +25,22 @@ package de.gematik.zeta.zetaguard.keycloak.commons.server
 
 import arrow.core.Either
 import arrow.core.left
+import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
+import java.lang.System.getenv
 import java.net.URI
 import java.security.MessageDigest
-import java.security.PublicKey
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.io.encoding.Base64
-import org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
 import org.keycloak.common.util.Base64Url
-import org.keycloak.common.util.PemUtils
+import org.keycloak.models.KeycloakUriInfo
 
 const val DIGEST_ALGORITHM = "SHA-256"
+
+val HASHING_PEPPER: String by lazy { safeGetenv(ENV_HASHING_PEPPER) }
 
 fun ByteArray.toBase64(): String = Base64Url.encode(this)
 
@@ -52,15 +53,6 @@ fun String?.toURI(): Either<Throwable, URI> =
     NullPointerException().left()
   }
 
-fun String.toCertificate(): X509Certificate {
-  val certificateFactory = CertificateFactory.getInstance("X.509", PROVIDER_NAME)
-  val bytes = Base64.decode(this)
-
-  return certificateFactory.generateCertificate(bytes.inputStream()) as X509Certificate
-}
-
-fun String.toPublicKey(): PublicKey = PemUtils.decodePublicKey(this)
-
 fun LocalDateTime.toISO8601(): String = format(DateTimeFormatter.ISO_DATE_TIME)
 
 fun String.toLocalDateTime(): LocalDateTime = LocalDateTime.parse(this, DateTimeFormatter.ISO_DATE_TIME)
@@ -71,4 +63,20 @@ fun currentTime(): LocalDateTime = LocalDateTime.now().truncatedTo(ChronoUnit.SE
 
 fun toHash(vararg bytes: ByteArray): ByteArray = MessageDigest.getInstance(DIGEST_ALGORITHM).apply { bytes.forEach { update(it) } }.digest()
 
+fun String.toSpicyHash() = (this + HASHING_PEPPER).toHash()
+
+fun String.toHash() = this.toByteArray().toHash().toBase64()
+
 fun ByteArray.toHash() = toHash(this)
+
+fun safeGetenv(name: String) = getenv(name) ?: error("Missing environment variable »$name«")
+
+fun String.toInputStream(): InputStream {
+  val file = File(this)
+
+  check(file.exists() && file.isFile && file.length() > 0) { "No valid data file found using path »$this«" }
+
+  return FileInputStream(file)
+}
+
+fun KeycloakUriInfo.baseUrl(): String = this.baseUri.toString().let { if (it.endsWith("/")) it else "$it/" }

@@ -25,6 +25,9 @@
 
 package de.gematik.zeta.zetaguard.keycloak.it
 
+import de.gematik.zeta.zetaguard.keycloak.commons.server.ENV_GENESIS_HASH
+import de.gematik.zeta.zetaguard.keycloak.commons.server.ENV_HASHING_PEPPER
+import de.gematik.zeta.zetaguard.keycloak.commons.server.HASHING_PEPPER
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_HASH
 import java.io.File
 import java.time.Duration
@@ -41,16 +44,17 @@ object Docker {
   internal val log: Logger = LoggerFactory.getLogger(this.javaClass)
 
   private val docker: ComposeContainer =
-      ComposeContainer(File("./docker-compose-it.yml"))
-          .withEnv("GENESIS_HASH", GENESIS_HASH)
-          .withLogConsumer("keycloak", Slf4jLogConsumer(log).withMdc("container", "keycloak"))
-          .withLogConsumer("keycloak-db", Slf4jLogConsumer(log).withMdc("container", "keycloak-db"))
-          .withLogConsumer("keycloak-config-cli", Slf4jLogConsumer(log).withMdc("container", "keycloak-config-cli"))
-          .withExposedService("keycloak", 8080, Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(240)))
-          .withExposedService("keycloak-db", 5432, Wait.forListeningPort())
-          .withExposedService("keycloak-config-cli", 0, WaitForTerminationStrategy)
-          .withRemoveVolumes(true)
-          .withPull(true)
+    ComposeContainer(File("./docker-compose-it.yml"))
+      .withEnv(ENV_GENESIS_HASH, GENESIS_HASH)
+      .withEnv(ENV_HASHING_PEPPER, HASHING_PEPPER)
+      .withLogConsumer("keycloak", Slf4jLogConsumer(log).withMdc("container", "keycloak"))
+      .withLogConsumer("keycloak-db", Slf4jLogConsumer(log).withMdc("container", "keycloak-db"))
+      .withLogConsumer("keycloak-config-cli", Slf4jLogConsumer(log).withMdc("container", "keycloak-config-cli"))
+      .withExposedService("keycloak", 8080, Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(240)))
+      .withExposedService("keycloak-db", 5432, Wait.forListeningPort())
+      .withExposedService("keycloak-config-cli", 0, WaitForTerminationStrategy)
+      .withRemoveVolumes(true)
+      .withPull(true)
 
   val kchost: String by lazy { if (running) docker.getServiceHost("keycloak", 8080) else "localhost" }
   val kcport: Int by lazy { if (running) docker.getServicePort("keycloak", 8080) else 18080 }

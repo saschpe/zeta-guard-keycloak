@@ -155,6 +155,7 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
     val request =
       post(uriBuilder().tokenUrl())
         .addFormHeaders()
+        .addHeader("X-Forwarded-For", "127.0.0.1") // A_28828
         .addHeader(DPOP_HTTP_HEADER, dPoPToken)
         .addParameter(GRANT_TYPE, REFRESH_TOKEN)
         .addParameter(REFRESH_TOKEN, refreshToken)
@@ -192,6 +193,7 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
     val request =
       post(uriBuilder().tokenUrl())
         .addFormHeaders()
+        .addHeader("X-Forwarded-For", "127.0.0.1") // A_28828
         .addParameter(CLIENT_ID, clientId)
         .addParameter(GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE)
         .addParameter(SUBJECT_TOKEN, subjectToken)
@@ -414,6 +416,8 @@ class KeycloakWebClient(hostname: String = KC_HOST, port: Int = KC_PORT) : Keycl
 
   /**
    * Create HTTP client with SSL (PKIX) and hostname checks disabled if needed.
+   *
+   * See logback.xml to enable request/response logging
    *
    * Also reset cached body for every request
    */

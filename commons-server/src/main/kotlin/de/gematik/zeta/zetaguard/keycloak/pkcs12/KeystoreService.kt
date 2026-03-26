@@ -27,6 +27,7 @@ import java.io.InputStream
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.cert.X509Certificate
+import javax.security.auth.x500.X500Principal
 import org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
 import org.keycloak.common.util.KeystoreUtil.KeystoreFormat.PKCS12
 
@@ -35,19 +36,17 @@ class KeystoreService(stream: InputStream, password: String) {
     KeyStore.getInstance(PKCS12.name, PROVIDER_NAME) // Always use BC in order to handle Brainpool curve
       .apply { load(stream, password.toCharArray()) }
   }
-  private val aliases: List<String> by lazy { keystore.aliases().toList().map { it.uppercase() } }
+  private val certificates: Map<String, X509Certificate> by lazy {
+    val aliases = keystore.aliases().toList().map { it.uppercase() }.toSet()
 
-  fun aliases() = aliases
+    aliases.associateWith { getCertificate(it) }
+  }
+
+  private val certificatesBySubject: Map<X500Principal, X509Certificate> by lazy { certificates.values.associateBy { it.subjectX500Principal } }
+
+  fun aliases() = certificates.keys
 
   fun hasCertificate(name: String): Boolean = aliases().contains(name.uppercase())
-
-  fun getCertificate(name: String): X509Certificate {
-    val certificate = keystore.getCertificate(name.uppercase()) ?: keystore.getCertificate(name)
-
-    requireNotNull(certificate) { "Certificate »$name« not found." }
-
-    return certificate as X509Certificate
-  }
 
   fun getPrivateKey(name: String, password: String): PrivateKey {
     val key = keystore.getKey(name.uppercase(), password.toCharArray()) ?: keystore.getCertificate(name)
@@ -57,7 +56,15 @@ class KeystoreService(stream: InputStream, password: String) {
     return key as PrivateKey
   }
 
-  fun certificates() = aliases().map { getCertificate(it) }
+  fun findCertificate(name: String): X509Certificate? = certificates[name.uppercase()]
 
-  fun findIssuerCertificate(certificate: X509Certificate) = certificates().firstOrNull { it.subjectX500Principal == certificate.issuerX500Principal }
+  fun findIssuerCertificate(certificate: X509Certificate): X509Certificate? = certificatesBySubject[certificate.issuerX500Principal]
+
+  private fun getCertificate(name: String): X509Certificate {
+    val certificate = keystore.getCertificate(name.uppercase()) ?: keystore.getCertificate(name)
+
+    requireNotNull(certificate) { "Certificate »$name« not found." }
+
+    return certificate as X509Certificate
+  }
 }

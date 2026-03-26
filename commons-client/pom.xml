@@ -5,7 +5,7 @@
     <parent>
         <groupId>de.gematik.zeta.zeta-guard</groupId>
         <artifactId>keycloak-zeta</artifactId>
-        <version>0.3.2</version>
+        <version>0.4.1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -13,7 +13,7 @@
     <artifactId>commons-client</artifactId>
 
     <name>𝝵-Guard :: Commons client</name>
-    <description>Common code and utilities for client side tests of 𝝵-Guard</description>
+    <description>Common code and utilities for client side testing of 𝝵-Guard</description>
 
     <properties>
         <!-- Keep analysis enabled, but exclude this module from coverage metrics -->
@@ -79,6 +79,11 @@
         </dependency>
 
         <dependency>
+            <groupId>io.mockk</groupId>
+            <artifactId>mockk-jvm</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>io.kotest.extensions</groupId>
             <artifactId>kotest-assertions-arrow-jvm</artifactId>
         </dependency>
@@ -92,11 +97,6 @@
         <dependency>
             <groupId>de.gematik.zeta.zeta-guard</groupId>
             <artifactId>commons-server</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>de.gematik.zeta.zeta-guard</groupId>
-            <artifactId>client-assertion</artifactId>
         </dependency>
 
         <dependency>

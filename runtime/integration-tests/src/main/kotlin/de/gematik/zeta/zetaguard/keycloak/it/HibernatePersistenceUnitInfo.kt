@@ -21,7 +21,7 @@
  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
  * #L%
  */
-@file:Suppress("removal")
+@file:Suppress("removal", "DEPRECATION")
 
 package de.gematik.zeta.zetaguard.keycloak.it
 

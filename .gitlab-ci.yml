@@ -12,19 +12,23 @@ stages:
   - test
   - release
   - publish
-  - container-scanning
+  - systemtest
+  - publish_reports
 
 include:
   - component: $CI_SERVER_FQDN/zeta/zeta-ci-cd-components/dependency-check-mvn@v0.4.0
     inputs:
       image: "$CI_REGISTRY/zeta/devops/ci-images/maven:3.9-eclipse-temurin-21-zeta-0"
+      cache-key: keycloak-zeta
 
-  - component: $CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-scanning@v0.4.0
+  - component: $CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-scanning@v0.4.1
     inputs:
-      analyzer-image: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/aquasec/trivy:latest
+      analyzer-image: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/aquasec/trivy:0.69.3@sha256:7228e304ae0f610a1fad937baa463598cadac0c2ac4027cc68f3a8b997115689
       cs-image: "$CI_REGISTRY/zeta/zeta-guard/keycloak-zeta:$CI_COMMIT_REF_SLUG"
+      git-strategy: fetch
       job-dependencies: [ deploy ]
-      job-stage: container-scanning
+      job-stage: systemtest
+      openvex-file: "vulnerabilites.openvex.json"
       severity: UNKNOWN,HIGH,CRITICAL
     rules:
       - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -83,7 +87,7 @@ variables:
     --settings ci_settings.xml
     -Ddocker.repo=$CI_REGISTRY
     -Ddocker.tag=$IMAGE_TAG
-    -Ddocker.keycloak.image=$CI_REGISTRY/zeta/devops/keycloak
+    -Ddocker.keycloak.image=$CI_REGISTRY/zeta/devops/ci-images/mirror/keycloak
 
   MAVEN_OPTS: >-
     -Dstyle.color=always
@@ -92,7 +96,7 @@ variables:
     -Dhttps.protocols=TLSv1.2
     -Djava.awt.headless=true
 
-  MAVEN_PROFILES: coverage,integration-tests,gitlab,sbom
+  MAVEN_PROFILES: coverage,integration-tests,gitlab,sbom,no-profiling
 
   # NOTE: trailing slash is important
   TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: $CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/
@@ -189,7 +193,7 @@ deploy:
       -DaltDeploymentRepository=gitlab::$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/maven \
       -DskipTests -DskipITs \
       -Dmaven.install.skip=true \
-      -P gitlab \
+      -P gitlab,no-profiling \
       deploy
 
     docker push "$IMAGE_NAME:$IMAGE_TAG"
@@ -206,14 +210,14 @@ release:
       -DaltDeploymentRepository=gitlab::$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/maven \
       -DskipTests \
       -Dmaven.install.skip=true \
-      -P gitlab \
+      -P gitlab,no-profiling \
       deploy
     docker push "$IMAGE_NAME:$IMAGE_TAG"
   rules:
     - !reference [ .rules_tags, rules ]
 
 trigger_helm:
-  stage: publish
+  stage: systemtest
   needs:
     - job: deploy
       optional: true
@@ -230,7 +234,7 @@ trigger_helm:
     PEPPROXY_IMAGE_TAG: "main"
 
 publish_artifacts:
-  stage: publish
+  stage: publish_reports
   rules:
     - if: $CI_COMMIT_TAG
       variables:
@@ -252,15 +256,52 @@ publish_artifacts:
       artifacts: true
     - job: sbom
       artifacts: true
+    - job: container-scanning
+      artifacts: true
+      optional: true
   script:
     - git clone https://zeta-sdk:${REPORTING_TOKEN}@tas-devtools-gitlab.spree.de/zeta/reporting.git
     - mkdir -p ./reporting/zeta-guard/keycloak-zeta/
     - find . -path ./reporting -prune -o -name 'jacoco.xml' -exec cp --parents '{}' ./reporting/zeta-guard/keycloak-zeta/ \;
     - find . -path ./reporting -prune -o -name 'dependency-check-report.json' -exec cp --parents '{}' ./reporting/zeta-guard/keycloak-zeta/ \;
     - find . -path ./reporting -prune -o -name 'bom.json' -exec cp --parents '{}' ./reporting/zeta-guard/keycloak-zeta/ \;
+    - find . -path ./reporting -prune -o -name 'gl-container-scanning-report.json' -exec cp --parents '{}' ./reporting/zeta-guard/keycloak-zeta/ \;
     - cd reporting
     - git config user.email "ci@tas-devtools-gitlab.spree.de"
     - git config  user.name "ci"
     - git add .
     - git commit -m "$COMMIT_MESSAGE"
     - git push
+
+publish_to_dependencytrack:
+  stage: publish
+  rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        VERSION: "$CI_COMMIT_TAG"
+      when: on_success
+    - if: $CI_COMMIT_BRANCH == "staging"
+      variables:
+        VERSION: "staging $CI_COMMIT_SHORT_SHA"
+      when: on_success
+    - if: $CI_COMMIT_BRANCH == "release"
+      variables:
+        VERSION: "release $CI_COMMIT_SHORT_SHA"
+      when: on_success
+    - if: $CI_MERGE_REQUEST_ID
+      variables:
+        VERSION: "MR $CI_MERGE_REQUEST_ID"
+      when: on_success
+    - when: never
+  needs:
+    - job: sbom
+      artifacts: true
+  script:
+    - >-
+      curl -v -X POST ${DEPENDENCYTRACK_URL}
+      -H "Content-Type: multipart/form-data"
+      -H "X-API-Key: ${DEPENDENCYTRACK_TOKEN}"
+      -F "projectName=keycloak-zeta"
+      -F "projectVersion=${VERSION}"
+      -F "autoCreate=true"
+      -F "bom=@target/bom.json"

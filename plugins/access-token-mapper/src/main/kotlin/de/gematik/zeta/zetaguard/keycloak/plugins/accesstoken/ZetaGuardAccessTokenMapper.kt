@@ -23,13 +23,22 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.plugins.accesstoken
 
-import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.toObject
 import de.gematik.zeta.zetaguard.keycloak.client_assertion.ClientInstanceData
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.ClientStatementData
+import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.toObject
 import de.gematik.zeta.zetaguard.keycloak.commons.expirationDate
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ACCESSTOKEN_MAPPERPROVIDER_ID
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_CLIENT_ASSESSMENT_DATA
+import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_CLIENT_STATEMENT_DATA
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_SMCB_CONTEXT
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_ACCESS_TOKEN_CLIENT_DATA
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_CLIENT_ID
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_COMMON_NAME
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_IP_ADDRESS
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_ORGANIZATION_NAME
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_PLATFORM
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_PRODUCT_ID
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_PRODUCT_VERSION
+import de.gematik.zeta.zetaguard.keycloak.commons.server.CLAIM_PROFESSION_OID
 import de.gematik.zeta.zetaguard.keycloak.commons.smcb.ZetaGuardTokenExchangeData
 import java.time.Duration
 import org.keycloak.models.ClientSessionContext
@@ -107,13 +116,23 @@ class ZetaGuardAccessTokenMapper :
    * https://gemspec.gematik.de/docs/gemSpec/gemSpec_ZETA/latest/#A_28527
    */
   private fun setClaims(userSession: UserSessionModel, token: IDToken, ttlMapper: (ZetaGuardTokenExchangeData) -> Duration) {
-    val contextString = userSession.getNote(ATTRIBUTE_SMCB_CONTEXT) ?: throw IllegalStateException("SMC-B context not found")
-    val clientDataString = userSession.getNote(ATTRIBUTE_CLIENT_ASSESSMENT_DATA) ?: throw IllegalStateException("Client assessment data not found")
+    val contextString = userSession.getNote(ATTRIBUTE_SMCB_CONTEXT) ?: error("SMC-B context not found")
+    val clientDataString = userSession.getNote(ATTRIBUTE_CLIENT_ASSESSMENT_DATA) ?: error("Client assessment data not found")
+    val clientStatementString = userSession.getNote(ATTRIBUTE_CLIENT_STATEMENT_DATA) ?: error("Client statement data not found")
     val exchangeData = contextString.toObject<ZetaGuardTokenExchangeData>()
     val clientData = clientDataString.toObject<ClientInstanceData>()
+    val clientStatement = clientStatementString.toObject<ClientStatementData>()
 
     token.subject(exchangeData.telematikID)
     token.expirationDate(ttlMapper(exchangeData))
-    token.otherClaims[CLAIM_ACCESS_TOKEN_CLIENT_DATA] = clientData
+
+    token.otherClaims[CLAIM_CLIENT_ID] = clientData.clientId
+    token.otherClaims[CLAIM_PROFESSION_OID] = exchangeData.professionOID
+    token.otherClaims[CLAIM_PRODUCT_ID] = clientStatement.posture.productId
+    token.otherClaims[CLAIM_PRODUCT_VERSION] = clientStatement.posture.productVersion
+    token.otherClaims[CLAIM_PLATFORM] = clientStatement.posture.platformProductId.productPlatform.value
+    token.otherClaims[CLAIM_COMMON_NAME] = exchangeData.subjectCommonName
+    token.otherClaims[CLAIM_ORGANIZATION_NAME] = exchangeData.subjectOrganisation
+    token.otherClaims[CLAIM_IP_ADDRESS] = exchangeData.clientIP
   }
 }

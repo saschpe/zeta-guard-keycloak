@@ -30,8 +30,9 @@ import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_SMCBUSER_ORGA
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_SMCBUSER_PROFESSION_OID
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_SMCBUSER_TELEMATIK_ID
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ENV_MAX_CLIENTS
-import de.gematik.zeta.zetaguard.keycloak.commons.toAccessToken
-import de.gematik.zeta.zetaguard.keycloak.plugins.token.getSMCBContext
+import de.gematik.zeta.zetaguard.keycloak.commons.server.toSpicyHash
+import de.gematik.zeta.zetaguard.keycloak.commons.toJsonWebToken
+import de.gematik.zeta.zetaguard.keycloak.plugins.token_exchange.getSMCBContext
 import org.keycloak.broker.oidc.OIDCIdentityProvider
 import org.keycloak.broker.oidc.OIDCIdentityProviderConfig
 import org.keycloak.broker.provider.BrokeredIdentityContext
@@ -53,17 +54,16 @@ private val MAX_CLIENTS = System.getenv(ENV_MAX_CLIENTS) ?: "256"
  */
 open class SMCBIdentityProvider(session: KeycloakSession, config: OIDCIdentityProviderConfig) : OIDCIdentityProvider(session, config) {
   private fun profile(subject: String, email: String, name: String, preferredUsername: String, givenName: String, familyName: String) =
-      ObjectMapper()
-          .readTree(
-              """{
+    ObjectMapper()
+      .readTree(
+        """{
               "sub": "$subject",
               "name": "$name",
               "given_name": "$givenName",
               "family_name": "$familyName",
               "preferred_username": "$preferredUsername",
               "email": "$email"
-            }"""
-          )
+            }""")
 
   /**
    * Inspired by [org.keycloak.broker.oidc.AbstractOAuth2IdentityProvider.validateExternalTokenThroughUserInfo] which is called by the legacy V1
@@ -73,26 +73,27 @@ open class SMCBIdentityProvider(session: KeycloakSession, config: OIDCIdentityPr
    */
   override fun exchangeExternalTokenV2Impl(tokenExchangeContext: TokenExchangeContext): BrokeredIdentityContext {
     val subjectToken = tokenExchangeContext.params.subjectToken
-    val accessToken = subjectToken.toAccessToken()
-    val subject = accessToken.subject ?: throw IllegalArgumentException("Access token has no subject")
-    val mailaddress = mailaddress(subject)
+    val token = subjectToken.toJsonWebToken()
+    val subject = token.subject ?: error("JWT has no subject")
+    val username = subject.toSpicyHash()
+    val mailaddress = mailaddress(username)
 
     return extractIdentityFromProfile(
-            tokenExchangeContext.event,
-            profile(
-                subject,
-                accessToken.email ?: mailaddress,
-                accessToken.name ?: subject,
-                accessToken.preferredUsername ?: mailaddress,
-                accessToken.givenName ?: subject,
-                accessToken.familyName ?: subject,
-            ),
-        )
-        .apply {
-          contextData[EXCHANGE_PROVIDER] = config.alias
-          idp = this@SMCBIdentityProvider
-          modelUsername = subject
-        }
+        tokenExchangeContext.event,
+        profile(
+          username,
+          mailaddress,
+          username,
+          mailaddress,
+          username,
+          username,
+        ),
+      )
+      .apply {
+        contextData[EXCHANGE_PROVIDER] = config.alias
+        idp = this@SMCBIdentityProvider
+        modelUsername = username
+      }
   }
 
   override fun importNewUser(session: KeycloakSession, realm: RealmModel, user: UserModel, context: BrokeredIdentityContext) {
@@ -122,7 +123,7 @@ open class SMCBIdentityProvider(session: KeycloakSession, config: OIDCIdentityPr
 
       val smcbContext = context.getSMCBContext()
 
-      userModel.setSingleAttribute(ATTRIBUTE_SMCBUSER_NAME, smcbContext.subjectName)
+      userModel.setSingleAttribute(ATTRIBUTE_SMCBUSER_NAME, smcbContext.subjectCommonName)
       userModel.setSingleAttribute(ATTRIBUTE_SMCBUSER_ORGANISATION, smcbContext.subjectOrganisation)
       userModel.setSingleAttribute(ATTRIBUTE_SMCBUSER_TELEMATIK_ID, smcbContext.telematikID)
       userModel.setSingleAttribute(ATTRIBUTE_SMCBUSER_PROFESSION_OID, smcbContext.professionOID)

@@ -25,22 +25,24 @@ package de.gematik.zeta.zetaguard.keycloak.it
 
 import de.gematik.zeta.zetaguard.keycloak.commons.ADMIN_CLIENT
 import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGenerator.buildCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.ClientAssertionTokenGenerator
+import de.gematik.zeta.zetaguard.keycloak.commons.DN_GEMATIK
+import de.gematik.zeta.zetaguard.keycloak.commons.DN_PRAXIS
 import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
-import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenGenerator
-import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.leafCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.subjectKeyPair
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.smcbTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTESTATION_STATE_PENDING
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTESTATION_STATE_VALID
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_ATTESTATION_STATE
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_REALM
 import de.gematik.zeta.zetaguard.keycloak.commons.server.fromBase64
+import de.gematik.zeta.zetaguard.keycloak.commons.server.generateKeyPair
 import de.gematik.zeta.zetaguard.keycloak.commons.server.toBase64
 import de.gematik.zeta.zetaguard.keycloak.commons.toAccessToken
-import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
+import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.clientAssertionTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.it.Docker.dbhost
 import de.gematik.zeta.zetaguard.keycloak.it.Docker.dbport
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.leafCertificate
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.subjectKeyPair
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.assertions.nondeterministic.eventuallyConfig
@@ -51,6 +53,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlin.time.Duration.Companion.seconds
 import org.apache.http.HttpStatus.SC_BAD_REQUEST
+import org.apache.http.HttpStatus.SC_FORBIDDEN
 import org.apache.http.HttpStatus.SC_UNAUTHORIZED
 import org.keycloak.OAuthErrorException.INVALID_CLIENT
 import org.keycloak.OAuthErrorException.INVALID_TOKEN
@@ -63,25 +66,22 @@ import org.keycloak.representations.oidc.OIDCClientRepresentation
 import org.keycloak.services.clientregistration.ClientRegistrationTokenUtils.TYPE_REGISTRATION_ACCESS_TOKEN
 
 @Order(1)
-class ClientRegistrationIT : ZetaGuardFunSpec() {
+class ClientRegistrationIT : ZetaGuardFunSpecIT() {
   init {
-    val keycloakWebClient = KeycloakWebClient()
     var nonce = ""
     var smbcToken = ""
     var jws = ""
     var oidcClientResponse = OIDCClientRepresentation()
-    val baseUri = keycloakWebClient.uriBuilder().build().toString()
-    val audiences = if (keycloakWebClient.path.isNotEmpty() && !baseUri.endsWith("/")) listOf("$baseUri/") else listOf(baseUri)
 
     beforeTest {
-      oidcClientResponse = keycloakWebClient.createClientOIDC(jwsTokenGenerator.keys.jwks).shouldBeRight().reponseObject
-      nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-      jws = jwsTokenGenerator.generateClientAssertion(oidcClientResponse, nonce)
+      oidcClientResponse = keycloakWebClient.createClientOIDC(clientAssertionTokenGenerator.keys.jwks).shouldBeRight().reponseObject
+      nonce = createNonce()
+      jws = clientAssertionTokenGenerator.generateClientAssertion(oidcClientResponse, nonce)
       // Other/new PKI
       smbcToken =
         smcbTokenGenerator.generateSMCBToken(
           nonceString = nonce,
-          audiences = audiences,
+          audiences = smcbTokenAudience,
           issuer = oidcClientResponse.clientId,
           issuedFor = oidcClientResponse.clientId,
           certificateChain = listOf(leafCertificate),
@@ -133,7 +133,7 @@ class ClientRegistrationIT : ZetaGuardFunSpec() {
       smbcToken =
         smcbTokenGenerator.generateSMCBToken(
           nonceString = nonce,
-          audiences = audiences,
+          audiences = smcbTokenAudience,
           issuer = oidcClientResponse.clientId,
           issuedFor = oidcClientResponse.clientId,
           certificateChain = listOf(certificate),
@@ -142,29 +142,32 @@ class ClientRegistrationIT : ZetaGuardFunSpec() {
       keycloakWebClient.testExchangeToken(subjectToken = smbcToken, clientId = oidcClientResponse.clientId, clientAssertion = jws) {
         it.error shouldBe INVALID_TOKEN
         it.errorDescription shouldContain "certificate does not verify"
-        it.statusCode shouldBe SC_BAD_REQUEST
+        it.statusCode shouldBe SC_FORBIDDEN
       }
     }
 
     test("Unknown certificate issuer") {
+      val certificate =
+        buildCertificate(
+          subjectName = DN_PRAXIS, subjectKeyPair = subjectKeyPair, issuerName = DN_GEMATIK, issuerKeyPair = generateKeyPair(), isCA = false)
       smbcToken =
         smcbTokenGenerator.generateSMCBToken(
           nonceString = nonce,
-          audiences = audiences,
+          audiences = smcbTokenAudience,
           issuer = oidcClientResponse.clientId,
           issuedFor = oidcClientResponse.clientId,
-          certificateChain = listOf(smcbTokenGenerator.certificate),
+          certificateChain = listOf(certificate),
         )
 
       keycloakWebClient.testExchangeToken(subjectToken = smbcToken, clientId = oidcClientResponse.clientId, clientAssertion = jws) {
         it.error shouldBe INVALID_TOKEN
         it.errorDescription shouldContain "issuer not found"
-        it.statusCode shouldBe SC_BAD_REQUEST
+        it.statusCode shouldBe SC_FORBIDDEN
       }
     }
 
     test("Token exchange fails, because of unknown public key signature of client assertion JWT") {
-      val jws = SMCBTokenGenerator().generateClientAssertion(oidcClientResponse, nonce) // Gnerates (unknowwn) new keys and certificates
+      val jws = ClientAssertionTokenGenerator().generateClientAssertion(oidcClientResponse, nonce) // Generates (unknowwn) new keys and certificates
 
       keycloakWebClient.testExchangeToken(subjectToken = smbcToken, clientId = oidcClientResponse.clientId, clientAssertion = jws) {
         it.error shouldBe INVALID_CLIENT
@@ -191,11 +194,12 @@ class ClientRegistrationIT : ZetaGuardFunSpec() {
 
     test("Token exchange fails for wrong issuer in client_assertion") {
       val invalidJWS =
-        jwsTokenGenerator.generateSMCBToken(
-          issuer = "jens",
+        clientAssertionTokenGenerator.generateClientAssertion(
+          clientId = "jens",
           subject = oidcClientResponse.clientId,
-          audiences = audiences,
           issuedFor = oidcClientResponse.clientId,
+          audiences = smcbTokenAudience,
+          nonceString = nonce,
         )
 
       /**
@@ -211,11 +215,12 @@ class ClientRegistrationIT : ZetaGuardFunSpec() {
 
     test("Token exchange fails because of wrong subject in client_assertion") {
       val invalidJWS =
-        jwsTokenGenerator.generateSMCBToken(
-          issuer = oidcClientResponse.clientId,
+        clientAssertionTokenGenerator.generateClientAssertion(
+          clientId = oidcClientResponse.clientId,
           subject = "jens",
-          audiences = listOf(oidcClientResponse.clientId),
           issuedFor = oidcClientResponse.clientId,
+          audiences = listOf(oidcClientResponse.clientId),
+          nonceString = nonce,
         )
 
       /**
@@ -235,11 +240,12 @@ class ClientRegistrationIT : ZetaGuardFunSpec() {
        * [org.keycloak.authentication.authenticators.client.AbstractJWTClientValidator.validateClient]
        */
       val invalidJWS =
-        jwsTokenGenerator.generateSMCBToken(
-          issuer = oidcClientResponse.clientId,
+        clientAssertionTokenGenerator.generateClientAssertion(
+          clientId = oidcClientResponse.clientId,
           subject = oidcClientResponse.clientId,
-          audiences = listOf("jens"),
           issuedFor = oidcClientResponse.clientId,
+          audiences = listOf("jens"),
+          nonceString = nonce,
         )
       keycloakWebClient.testExchangeToken(subjectToken = smbcToken, clientId = oidcClientResponse.clientId, clientAssertion = invalidJWS) {
         it.error shouldBe INVALID_CLIENT

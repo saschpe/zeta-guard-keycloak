@@ -24,27 +24,30 @@
 package de.gematik.zeta.zetaguard.keycloak.plugins.opa
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.PROPERTY_PRODUCT_ID
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.PROPERTY_PRODUCT_VERSION
+import org.keycloak.OAuth2Constants.GRANT_TYPE
 
 data class OpaInput(val input: Input) {
   data class Input(
-      @get:JsonProperty("authorization_request") val authorizationRequest: AuthorizationRequest? = null,
-      @get:JsonProperty("user_info") val userInfo: UserInfo? = null,
-      @get:JsonProperty("client_assertion") val clientAssertion: ClientAssertion? = null,
+      @get:JsonProperty("authorization_request") val authorizationRequest: OpaAuthorizationRequest? = null,
+      @get:JsonProperty("user_info") val userInfo: OpaUserInfo? = null,
+      @get:JsonProperty("client_assertion") val clientAssertion: OpaClientAssertion? = null,
   )
 
-  data class AuthorizationRequest(
+  data class OpaAuthorizationRequest(
       val scopes: List<String>? = null,
-      val aud: List<String>? = null,
-      @get:JsonProperty("grant_type") val grantType: String? = null,
+      val audience: List<String>? = null,
+      @get:JsonProperty(GRANT_TYPE) val grantType: String? = null,
       @get:JsonProperty("ip_address") val ipAddress: String? = null,
   )
 
-  data class UserInfo(@get:JsonProperty("professionOID") val professionOID: String? = null)
+  data class OpaUserInfo(@get:JsonProperty("professionOID") val professionOID: String? = null)
 
-  data class ClientAssertion(val posture: Posture? = null)
+  data class OpaClientAssertion(val posture: OpaPosture? = null)
 
-  data class Posture(
-      @get:JsonProperty("product_id") val productId: String? = null,
-      @get:JsonProperty("product_version") val productVersion: String? = null,
+  data class OpaPosture(
+      @get:JsonProperty(PROPERTY_PRODUCT_ID) val productId: String? = null,
+      @get:JsonProperty(PROPERTY_PRODUCT_VERSION) val productVersion: String? = null,
   )
 }

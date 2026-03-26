@@ -24,9 +24,9 @@
 package de.gematik.zeta.zetaguard.keycloak.plugins
 
 import de.gematik.zeta.zetaguard.keycloak.commons.server.message
-import de.gematik.zeta.zetaguard.keycloak.plugins.token.KeycloakValidationError
-import de.gematik.zeta.zetaguard.keycloak.plugins.token.ZetaGuardTokenExchangeProvider
-import jakarta.ws.rs.core.Response.Status.BAD_REQUEST
+import de.gematik.zeta.zetaguard.keycloak.plugins.token_exchange.KeycloakValidationError
+import de.gematik.zeta.zetaguard.keycloak.plugins.token_exchange.ZetaGuardTokenExchangeProvider
+import jakarta.ws.rs.core.Response.Status.FORBIDDEN
 import jakarta.ws.rs.core.Response.Status.fromStatusCode
 import org.jboss.logging.Logger
 import org.keycloak.OAuthErrorException
@@ -41,33 +41,35 @@ import org.keycloak.services.CorsErrorResponseException
 internal val logger: Logger = Logger.getLogger(ZetaGuardTokenExchangeProvider::class.java)
 
 internal fun exchangeError(throwable: Throwable, error: String = "token_exchange"): KeycloakValidationError =
-    KeycloakValidationError(error, throwable.message(), BAD_REQUEST).also { logger.warn(it.toString(), throwable) }
+    KeycloakValidationError(error, throwable.message(), FORBIDDEN).also { logger.warn(it.toString(), throwable) }
 
-internal fun invalidToken(reason: String) = KeycloakValidationError(INVALID_TOKEN, reason, BAD_REQUEST)
+internal fun invalidToken(reason: String) = KeycloakValidationError(INVALID_TOKEN, reason, FORBIDDEN)
+
+internal fun invalidTPMQuote(reason: String) = KeycloakValidationError("Invalid TPM quote", reason, FORBIDDEN)
 
 internal fun invalidClientClaim(reason: String) =
-    KeycloakValidationError(INVALID_TOKEN, "Invalid or missing client claim: $reason", BAD_REQUEST)
+    KeycloakValidationError(INVALID_TOKEN, "Invalid or missing client claim: $reason", FORBIDDEN)
 
 internal fun invalidClientAttestation(reason: String) =
-    KeycloakValidationError(INVALID_TOKEN, "Client attestation failed: $reason", BAD_REQUEST)
+    KeycloakValidationError("Invalid client attestation", reason, FORBIDDEN)
 
 internal fun invalidClientPublicKey(reason: String) =
-    KeycloakValidationError(INVALID_TOKEN, "Cannot verify client public key: $reason", BAD_REQUEST)
+    KeycloakValidationError(INVALID_TOKEN, "Cannot verify client public key: $reason", FORBIDDEN)
 
-internal fun missingClientState() = KeycloakValidationError(INVALID_CLIENT, "Missing client attestation state", BAD_REQUEST)
+internal fun missingClientState() = KeycloakValidationError(INVALID_CLIENT, "Missing client attestation state", FORBIDDEN)
 
-internal fun invalidNonce() = KeycloakValidationError(INVALID_TOKEN, "Invalid nonce value", BAD_REQUEST)
+internal fun invalidNonce() = KeycloakValidationError(INVALID_TOKEN, "Invalid nonce value", FORBIDDEN)
 
 internal fun invalidSubject(telematikID: String) =
-    KeycloakValidationError(INVALID_TOKEN, "Invalid subject, does not match certificate", BAD_REQUEST).also {
+    KeycloakValidationError(INVALID_TOKEN, "Invalid subject, does not match certificate", FORBIDDEN).also {
       logger.warn("Invalid subject, does not match certificate registration number »$telematikID«")
     }
 
 internal fun internalError(e: Throwable) =
-    KeycloakValidationError(SERVER_ERROR, e.message(), BAD_REQUEST).also { logger.error("Internal server error", e) }
+    KeycloakValidationError(SERVER_ERROR, e.message(), FORBIDDEN).also { logger.error("Internal server error", e) }
 
 internal fun ZetaGuardTokenExchangeProvider.clientDisabled(disabledTargetAudienceClient: ClientModel) =
-    CorsErrorResponseException(context().cors, INVALID_CLIENT, "Targeted client ${disabledTargetAudienceClient.clientId} is disabled", BAD_REQUEST)
+    CorsErrorResponseException(context().cors, INVALID_CLIENT, "Targeted client ${disabledTargetAudienceClient.clientId} is disabled", FORBIDDEN)
         .also {
           val event = context().event
           event.detail(Details.REASON, it.errorDescription)
@@ -75,13 +77,15 @@ internal fun ZetaGuardTokenExchangeProvider.clientDisabled(disabledTargetAudienc
           event.error(Errors.CLIENT_DISABLED)
         }
 
-internal fun invalidContext() = KeycloakValidationError(Errors.INVALID_CONFIG, "Could not create BrokeredIdentityContext", BAD_REQUEST)
+internal fun invalidContext() = KeycloakValidationError(Errors.INVALID_CONFIG, "Could not create BrokeredIdentityContext", FORBIDDEN)
 
-internal fun invalidProviderModel() = KeycloakValidationError(Errors.INVALID_CONFIG, "Identity provider not found", BAD_REQUEST)
+internal fun invalidProviderModel() = KeycloakValidationError(Errors.INVALID_CONFIG, "Identity provider not found", FORBIDDEN)
 
-internal fun invalidGrantType() = KeycloakValidationError(OAuthErrorException.INVALID_GRANT, "Invalid grant type", BAD_REQUEST)
+internal fun invalidGrantType() = KeycloakValidationError(OAuthErrorException.INVALID_GRANT, "Invalid grant type", FORBIDDEN)
 
-internal fun invalidCertificate(reason: String) = KeycloakValidationError("invalid_x5c_certificate", reason, BAD_REQUEST)
+internal fun invalidCertificate(reason: String) = KeycloakValidationError("invalid_x5c_certificate", reason, FORBIDDEN)
+
+internal fun invalidTpmCertificate(reason: String) = KeycloakValidationError("Invalid TPM certificate chain", reason, FORBIDDEN)
 
 internal fun ZetaGuardTokenExchangeProvider.mapToCorsException(e: KeycloakValidationError) =
     CorsErrorResponseException(context().cors, e.error, e.errorDescription, fromStatusCode(e.statusCode)).also {

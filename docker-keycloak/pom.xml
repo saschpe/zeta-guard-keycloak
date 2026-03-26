@@ -5,7 +5,7 @@
     <parent>
         <groupId>de.gematik.zeta.zeta-guard</groupId>
         <artifactId>keycloak-zeta</artifactId>
-        <version>0.3.2</version>
+        <version>0.4.1</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -14,9 +14,13 @@
     <description>Create pre-configured Keycloak image</description>
 
     <properties>
-        <docker.keycloak.image>zeta/devops/keycloak</docker.keycloak.image>
+        <docker.keycloak.image>quay.io/keycloak/keycloak</docker.keycloak.image>
         <docker.name>zeta/zeta-guard/keycloak-zeta</docker.name>
         <docker.tag>latest</docker.tag>
+
+        <!-- https://github.com/async-profiler/async-profiler -->
+        <async.profiler>async-profiler</async.profiler>
+        <async.profiler.version>async-profiler-4.3-linux-arm64</async.profiler.version>
         <docker.repo/>
     </properties>
 
@@ -25,6 +29,11 @@
             <resource>
                 <directory>src/main/docker</directory>
                 <filtering>true</filtering>
+            </resource>
+
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
             </resource>
         </resources>
 
@@ -123,9 +132,8 @@
                                 </artifactItem>
 
                                 <artifactItem>
-                                    <groupId>${project.groupId}</groupId>
-                                    <artifactId>client-assertion</artifactId>
-                                    <destFileName>client-assertion.jar</destFileName>
+                                    <groupId>com.microsoft.azure</groupId>
+                                    <artifactId>TSS.Java</artifactId>
                                 </artifactItem>
 
                                 <artifactItem>
@@ -160,7 +168,74 @@
 
     <profiles>
         <profile>
+            <id>no-profiling</id>
+
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+
+                        <executions>
+                            <execution>
+                                <id>create empty distribution</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+
+                                <configuration>
+                                    <target>
+                                        <mkdir dir="target/classes/${async.profiler}-empty/bin"/>
+                                        <touch file="target/classes/${async.profiler}-empty/bin/empty.sh"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>profiling</id>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+
+                        <executions>
+                            <execution>
+                                <id>copy async-profiler</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <gunzip src="src/main/dist/${async.profiler.version}.tar.gz" dest="target/${async.profiler.version}.tar"/>
+                                        <untar src="target/${async.profiler.version}.tar" dest="target/classes/"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
             <id>gitlab</id>
+
+            <properties>
+                <docker.keycloak.image>zeta/devops/keycloak</docker.keycloak.image>
+            </properties>
 
             <build>
                 <plugins>
@@ -196,3 +271,4 @@
         </profile>
     </profiles>
 </project>
+

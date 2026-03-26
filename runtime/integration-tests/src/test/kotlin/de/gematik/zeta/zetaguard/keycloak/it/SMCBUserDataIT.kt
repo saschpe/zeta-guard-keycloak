@@ -23,21 +23,17 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.it
 
-import de.gematik.zeta.zetaguard.keycloak.commons.CLIENT_B_SCOPE
-import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
+import de.gematik.zeta.zetaguard.keycloak.commons.CRT_GEMATIK_LEAF_NAME
+import de.gematik.zeta.zetaguard.keycloak.commons.PROFESSION_OID
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.leafCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.smcbTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.commons.TELEMATIK_ID
-import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_SMCBUSER_NAME
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ATTRIBUTE_SMCBUSER_PROFESSION_OID
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF_NAME
-import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
-import de.gematik.zeta.zetaguard.keycloak.commons.server.betriebsstaetteArzt
-import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
+import de.gematik.zeta.zetaguard.keycloak.commons.server.toSpicyHash
+import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.clientAssertionTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.it.Docker.dbhost
 import de.gematik.zeta.zetaguard.keycloak.it.Docker.dbport
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.leafCertificate
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import org.hibernate.Hibernate
 import org.keycloak.models.jpa.entities.CredentialEntity
@@ -46,32 +42,28 @@ import org.keycloak.models.jpa.entities.UserAttributeEntity
 import org.keycloak.models.jpa.entities.UserEntity
 import org.keycloak.models.jpa.entities.UserRequiredActionEntity
 
-class SMCBUserDataIT : ZetaGuardFunSpec() {
+class SMCBUserDataIT : ZetaGuardFunSpecIT() {
   init {
-    val keycloakWebClient = KeycloakWebClient()
-    val baseUri = keycloakWebClient.uriBuilder().build().toString()
-    val realmUrl = keycloakWebClient.uriBuilder().realmUrl().toString()
-    val nonce = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-    val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+    val nonce = createNonce()
+    val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
     val smcbToken =
       smcbTokenGenerator.generateSMCBToken(
-        subject = TELEMATIK_ID,
         nonceString = nonce,
-        audiences = listOf(baseUri),
+        audiences = smcbTokenAudience,
         certificateChain = listOf(leafCertificate),
       )
 
     test("Check stored user data") {
-      keycloakWebClient.testExchangeToken(smcbToken, requestedClientScope = CLIENT_B_SCOPE, clientAssertion = jwt)
+      keycloakWebClient.testExchangeToken(smcbToken, clientAssertion = jwt)
 
-      val user = lookupUser(TELEMATIK_ID)
+      val user = lookupUser(TELEMATIK_ID.toSpicyHash().lowercase())
 
       user.attributes.first { it.name == ATTRIBUTE_SMCBUSER_NAME }.value shouldBe CRT_GEMATIK_LEAF_NAME
-      user.attributes.first { it.name == ATTRIBUTE_SMCBUSER_PROFESSION_OID }.value shouldBe betriebsstaetteArzt.id
+      user.attributes.first { it.name == ATTRIBUTE_SMCBUSER_PROFESSION_OID }.value shouldBe PROFESSION_OID
     }
   }
 
-  private fun lookupUser(@Suppress("SameParameterValue") userName: String): UserEntity {
+  private fun lookupUser(userName: String): UserEntity {
     val entityClasses =
       arrayOf(
         UserEntity::class.java,

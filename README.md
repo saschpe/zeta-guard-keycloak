@@ -45,6 +45,18 @@ For a build including the integration tests, use:
     ./mvnw clean install -P integration-tests
 ```
 
+## Generate code coverage data
+
+```shell
+    ./mvnw clean install -Pcoverage,integration-tests
+```
+
+## Generate profiling data (JFR)
+
+```shell
+    ./mvnw clean install -Pprofiling,integration-tests
+```
+
 If the integration tests fail to start any containers, try running `docker compose down -v` in the _runtime/_ directory first.
 
 # Formatting and linting
