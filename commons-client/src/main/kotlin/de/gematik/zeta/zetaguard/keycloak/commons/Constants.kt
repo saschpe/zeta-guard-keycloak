@@ -25,6 +25,8 @@
 
 package de.gematik.zeta.zetaguard.keycloak.commons
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier
+
 const val KC_HOST = "localhost"
 const val KC_PORT = 18080
 
@@ -53,3 +55,22 @@ const val ZETA_GUARD_CLIENT_NAME = "$ZETA-Guard client"
 
 const val TELEMATIK_ID = "1-10.3.9876540000.10.246"
 const val TELEMATIK_ID2 = "1-10.3.9876541000.10.249"
+
+const val CRT_GEMATIK_ROOT = "gem.smcb-ca1_test-only"
+const val CRT_GEMATIK_ROOT_DN = "CN=GEM.RCA1 TEST-ONLY, OU=Zentrale Root-CA der Telematikinfrastruktur, O=gematik GmbH NOT-VALID, C=DE"
+const val CRT_GEMATIK_INTERMEDIATE = "gem.smcb-ca57_test-only"
+const val CRT_GEMATIK_INTERMEDIATE_DN =
+  "C=DE, O=gematik GmbH NOT-VALID, OU=Institution des Gesundheitswesens-CA der Telematikinfrastruktur, CN=GEM.SMCB-CA8 TEST-ONLY"
+const val CRT_GEMATIK_LEAF = "zeta.c_smcb_aut"
+const val CRT_GEMATIK_LEAF_NAME = "Arztpraxis Ann-Beatrixe Zeta TEST-ONLY"
+const val CRT_GEMATIK_LEAF_ORGANISATION = "300060625 NOT-VALID"
+const val CRT_GEMATIK_LEAF_DN = "C=DE, O=$CRT_GEMATIK_LEAF_ORGANISATION, CN=$CRT_GEMATIK_LEAF_NAME"
+
+const val BETRIEBSSTAETTE_ARZT = "Betriebsstätte Arzt"
+const val PRODUCT_ID = "𝛇-Guard client"
+const val PRODUCT_VERSION = "3.1415.93"
+
+// https://gemspec.gematik.de/downloads/gemSpec/gemSpec_OID/gemSpec_OID_V3.12.3_Aend.html#3.5.1.3
+val betriebsstaetteArzt = ASN1ObjectIdentifier("1.2.276.0.76.4.50")
+val gematikPolicy = ASN1ObjectIdentifier("1.2.276.0.76.4.163")
+val smcbAuth = ASN1ObjectIdentifier("1.2.276.0.76.4.77")

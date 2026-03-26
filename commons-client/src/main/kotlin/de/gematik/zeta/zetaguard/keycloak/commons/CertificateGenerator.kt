@@ -25,12 +25,8 @@
 
 package de.gematik.zeta.zetaguard.keycloak.commons
 
-import de.gematik.zeta.zetaguard.keycloak.commons.server.BETRIEBSSTAETTE_ARZT
 import de.gematik.zeta.zetaguard.keycloak.commons.server.admission
-import de.gematik.zeta.zetaguard.keycloak.commons.server.betriebsstaetteArzt
-import de.gematik.zeta.zetaguard.keycloak.commons.server.gematikPolicy
 import de.gematik.zeta.zetaguard.keycloak.commons.server.signingAlgorithm
-import de.gematik.zeta.zetaguard.keycloak.commons.server.smcbAuth
 import java.math.BigInteger
 import java.security.KeyPair
 import java.security.PublicKey
@@ -59,6 +55,10 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+
+// DN bottom-up order as specified by https://www.rfc-editor.org/rfc/rfc1779#section-2.2
+const val DN_GEMATIK = "CN=GEM.SMC-B,OU=Institution des Gesundheitswesens-CA der Telematikinfrastruktur,O=gematik GmbH,C=DE"
+const val DN_PRAXIS = "CN=Praxis Dr. Eisenbart,STREET=Goethestr. 5,L=Essen,ST=Nordrhein-Westfalen,C=DE"
 
 /**
  * Build a single X.509 Certificate optionally signed by another X.509 Certificate.

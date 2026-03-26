@@ -28,6 +28,9 @@ package de.gematik.zeta.zetaguard.keycloak.commons.server
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
+import arrow.core.raise.ensureNotNull
+import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreService
+import java.io.StringReader
 import java.io.StringWriter
 import java.security.Key
 import java.security.PublicKey
@@ -48,27 +51,20 @@ import org.bouncycastle.asn1.x500.style.BCStyle
 import org.bouncycastle.asn1.x500.style.IETFUtils
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder
 import org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
+import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter
-
-const val CRT_GEMATIK_ROOT = "gem.smcb-ca1_test-only"
-const val CRT_GEMATIK_ROOT_DN = "CN=GEM.RCA1 TEST-ONLY, OU=Zentrale Root-CA der Telematikinfrastruktur, O=gematik GmbH NOT-VALID, C=DE"
-const val CRT_GEMATIK_INTERMEDIATE = "gem.smcb-ca57_test-only"
-const val CRT_GEMATIK_INTERMEDIATE_DN = "C=DE, O=gematik GmbH NOT-VALID, OU=Institution des Gesundheitswesens-CA der Telematikinfrastruktur, CN=GEM.SMCB-CA8 TEST-ONLY"
-const val CRT_GEMATIK_LEAF = "zeta.c_smcb_aut"
-const val CRT_GEMATIK_LEAF_NAME = "Arztpraxis Ann-Beatrixe Zeta TEST-ONLY"
-const val CRT_GEMATIK_LEAF_ORGANISATION = "300060625 NOT-VALID"
-const val CRT_GEMATIK_LEAF_DN = "C=DE, O=$CRT_GEMATIK_LEAF_ORGANISATION, CN=$CRT_GEMATIK_LEAF_NAME"
+import org.keycloak.common.util.PemUtils
 
 // https://oidref.com/1.3.36.8.3.3
 val admission = ASN1ObjectIdentifier("1.3.36.8.3.3")
 
-// https://gemspec.gematik.de/downloads/gemSpec/gemSpec_OID/gemSpec_OID_V3.12.3_Aend.html#3.5.1.3
-val betriebsstaetteArzt = ASN1ObjectIdentifier("1.2.276.0.76.4.50")
-val gematikPolicy = ASN1ObjectIdentifier("1.2.276.0.76.4.163")
-val smcbAuth = ASN1ObjectIdentifier("1.2.276.0.76.4.77")
-
-const val BETRIEBSSTAETTE_ARZT = "Betriebsstätte Arzt"
-
+/**
+ * Returns true if the certificate appears to be a self-signed root certificate.
+ *
+ * This checks two things:
+ * 1) That the certificate's signature can be verified using its own public key (self-signed).
+ * 2) That the certificate's key usage indicates certificate signing capability (keyUsage[5]).
+ */
 fun X509Certificate.isRoot(): Boolean {
   try {
     verify(publicKey)
@@ -78,6 +74,16 @@ fun X509Certificate.isRoot(): Boolean {
   }
 }
 
+/**
+ * Returns true if the certificate appears to be an intermediate CA certificate.
+ *
+ * Behavior:
+ * - Attempts to verify the certificate using its own public key. If verification succeeds, it is considered a root (self-signed) and this function
+ *   returns false.
+ * - If verification throws a SignatureException with the specific message "certificate does not verify with supplied key", we interpret that as the
+ *   certificate being signed by a different key (i.e. an intermediate) and return true.
+ * - Any other exception will result in false.
+ */
 fun X509Certificate.isIntermediate(): Boolean {
   try {
     verify(publicKey)
@@ -87,70 +93,161 @@ fun X509Certificate.isIntermediate(): Boolean {
   }
 }
 
+/**
+ * Encode this X.509 certificate to a base64 DER string.
+ *
+ * The underlying certificate's encoded form (ASN.1 DER) is base64-encoded and returned.
+ */
+fun X509Certificate.toDER() = encoded.toBase64()
+
+/**
+ * Encode a generic Key (for example a PrivateKey or PublicKey) to a base64 DER string.
+ *
+ * The key's encoded form is base64-encoded and returned.
+ */
+fun Key.toDER() = encoded.toBase64()
+
+/**
+ * Convert this X.509 certificate to a PEM formatted string.
+ *
+ * The returned string contains the standard PEM headers and base64 body for the certificate.
+ */
 fun X509Certificate.toPEM() = toPEMString()
 
+/**
+ * Convert this Key to a PEM formatted string.
+ *
+ * The returned string contains the standard PEM headers and base64 body for the certificate.
+ */
 fun Key.toPEM() = toPEMString()
 
+/** Internal helper that writes any object understandable by BouncyCastle's JcaPEMWriter to a PEM string. */
 private fun Any.toPEMString(): String {
   val out = StringWriter()
   JcaPEMWriter(out).use { it.writeObject(this@toPEMString) }
   return out.toString()
 }
 
+/** Validate that the provided certificate's signature was generated with the given public key. */
 fun validateCertificateSignature(certificate: X509Certificate, publicKey: PublicKey): Either<String, Success> = either {
   Either.catch { certificate.verify(publicKey) }
-      .mapLeft {
-        logger.error("Signature validation failed for $certificate", it)
-        it.message ?: "Signature validation failed"
-      }
-      .bind()
+    .mapLeft {
+      logger.error("Signature validation failed for $certificate", it)
+      it.message ?: "Signature validation failed"
+    }
+    .bind()
 
   SimpleSuccess
 }
 
+/**
+ * Heuristically check whether the provided string contains a PEM object.
+ *
+ * Returns true when BouncyCastle's PEMParser can read at least one object from the string.
+ */
+fun String.isPEMFormat(): Boolean =
+  try {
+    PEMParser(StringReader(this)).use { it.readObject() != null }
+  } catch (e: Exception) {
+    false
+  }
+
+/**
+ * Convert a string containing either a PEM-encoded certificate or a base64 DER certificate to an X509Certificate.
+ *
+ * Behavior:
+ * - If the input is recognized as PEM, it uses Keycloak's PemUtils to decode it.
+ * - Otherwise, the string is treated as base64-encoded DER and decoded via a CertificateFactory using the configured BouncyCastle provider.
+ */
+fun String.toCertificate(): X509Certificate =
+  if (isPEMFormat()) {
+    PemUtils.decodeCertificate(this)
+  } else {
+    val bytes = fromBase64()
+    val certificateFactory = CertificateFactory.getInstance("X.509", PROVIDER_NAME)
+
+    certificateFactory.generateCertificate(bytes.inputStream()) as X509Certificate
+  }
+
+/**
+ * Validate a certificate chain against a trust store provided by the KeystoreService.
+ *
+ * Process:
+ * - Finds the first certificate in the provided chain that has an issuer present in the keystore_service.
+ * - Validate against that certificate
+ */
+fun validateCertificateChain(keystoreService: KeystoreService, certificateChain: List<X509Certificate>): Either<String, PKIXCertPathValidatorResult> =
+  either {
+    val certificate = certificateChain.first { keystoreService.findIssuerCertificate(it) != null }
+
+    ensureNotNull(certificate) { "No issuer certificate found in trust store" }
+
+    val certificateIndex = certificateChain.indexOf(certificate)
+    val chain = certificateChain.subList(0, certificateIndex + 1)
+    val rootCertificate = keystoreService.findIssuerCertificate(certificate)!!
+
+    validateCertificateChain(rootCertificate, chain).bind()
+  }
+
+/**
+ * Validate a certificate chain against a provided root certificate (trust anchor).
+ *
+ * This function performs PKIX validation using the BouncyCastle provider with optional revocation checking.
+ */
 fun validateCertificateChain(
-    rootCertificate: X509Certificate,
-    vararg certificateChain: X509Certificate,
+  rootCertificate: X509Certificate,
+  certificateChain: List<X509Certificate>,
+  revocationCheck: Boolean = false
 ): Either<String, PKIXCertPathValidatorResult> = either {
   ensure(certificateChain.isNotEmpty()) { "Certificate chain is empty" }
 
   Either.catch {
-        val certFactory = CertificateFactory.getInstance("X.509", PROVIDER_NAME)
-        val chainToValidate = listOf(*certificateChain)
-        val certPath = certFactory.generateCertPath(chainToValidate)
-        val trustAnchor = TrustAnchor(rootCertificate, null)
-        val params = PKIXParameters(setOf(trustAnchor)).apply { isRevocationEnabled = false }
-        val validator = CertPathValidator.getInstance("PKIX", PROVIDER_NAME)
+      val certFactory = CertificateFactory.getInstance("X.509", PROVIDER_NAME)
+      val certPath = certFactory.generateCertPath(certificateChain)
+      val trustAnchor = TrustAnchor(rootCertificate, null)
+      val params = PKIXParameters(setOf(trustAnchor)).apply { isRevocationEnabled = revocationCheck }
+      val validator = CertPathValidator.getInstance("PKIX", PROVIDER_NAME)
 
-        validator.validate(certPath, params) as PKIXCertPathValidatorResult
-      }
-      .mapLeft {
-        logger.error("Certificate validation failed for ${certificateChain.toList()}", it)
-        it.message ?: "Certificate validation failed"
-      }
-      .bind()
+      validator.validate(certPath, params) as PKIXCertPathValidatorResult
+    }
+    .mapLeft {
+      logger.error("Certificate validation failed for ${certificateChain.toList()}", it)
+      it.message ?: "Certificate validation failed"
+    }
+    .bind()
 }
 
+/**
+ * Extract a typed ASN.1 extension from this certificate using the provided OID.
+ *
+ * This helper uses BouncyCastle's JcaX509CertificateHolder to obtain the parsed extension.
+ */
 inline fun <reified T : ASN1Encodable> X509Certificate.extractExtension(oid: ASN1ObjectIdentifier): T? =
-    try {
-      val certHolder = JcaX509CertificateHolder(this)
-      val encodable = certHolder.getExtension(oid)?.parsedValue
+  try {
+    val certHolder = JcaX509CertificateHolder(this)
+    val encodable = certHolder.getExtension(oid)?.parsedValue
 
-      T::class.members.find { it.name == "getInstance" }?.call(encodable) as T?
-    } catch (e: Exception) {
-      logger.warn("Error parsing extension $oid: ${e.message}")
-      null
-    }
+    T::class.members.find { it.name == "getInstance" }?.call(encodable) as T?
+  } catch (e: Exception) {
+    logger.warn("Error parsing extension $oid: ${e.message}")
+    null
+  }
 
+/** Return the first Admissions element contained in an AdmissionSyntax instance, or null if none exist. */
 fun AdmissionSyntax.firstAdmission(): Admissions? = if (contentsOfAdmissions.isNotEmpty()) contentsOfAdmissions[0] else null
 
+/** Return the first ProfessionInfo element contained in an Admissions instance, or null if none exist. */
 fun Admissions.firstProfessionInfo(): ProfessionInfo? = if (professionInfos.isNotEmpty()) professionInfos[0] else null
 
+/** Return the first profession OID contained in a ProfessionInfo instance, or null if none exist. */
 fun ProfessionInfo.firstProfession(): ASN1ObjectIdentifier? = if (professionOIDs.isNotEmpty()) professionOIDs[0] else null
 
+/** Convenience: extract the Common Name (CN) component from the certificate's subject DN. */
 fun X509Certificate.subjectCommonName() = getSubjectComponent(BCStyle.CN)
 
+/** Convenience: extract the Organization (O) component from the certificate's subject DN. */
 fun X509Certificate.subjectOrganisationName() = getSubjectComponent(BCStyle.O)
 
+/** Internal helper to extract a single subject component value from this certificate's subject DN using the provided ASN.1 identifier. */
 private fun X509Certificate.getSubjectComponent(identifier: ASN1ObjectIdentifier) =
-    X500Name(subjectX500Principal.name).getRDNs(identifier).map { IETFUtils.valueToString(it.first.value) }.firstOrNull() ?: "Unbekannt"
+  X500Name(subjectX500Principal.name).getRDNs(identifier).map { IETFUtils.valueToString(it.first.value) }.firstOrNull() ?: "Unbekannt"

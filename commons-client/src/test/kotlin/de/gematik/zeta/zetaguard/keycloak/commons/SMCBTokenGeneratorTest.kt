@@ -25,17 +25,16 @@
 
 package de.gematik.zeta.zetaguard.keycloak.commons
 
-import de.gematik.zeta.zetaguard.keycloak.commons.server.BETRIEBSSTAETTE_ARZT
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF
+import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGenerator.buildCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.leafCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.subjectKeyPair
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
 import de.gematik.zeta.zetaguard.keycloak.commons.server.admission
-import de.gematik.zeta.zetaguard.keycloak.commons.server.betriebsstaetteArzt
 import de.gematik.zeta.zetaguard.keycloak.commons.server.createVerifierContext
+import de.gematik.zeta.zetaguard.keycloak.commons.server.generateKeyPair
 import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
 import de.gematik.zeta.zetaguard.keycloak.commons.server.toCertificate
 import de.gematik.zeta.zetaguard.keycloak.commons.server.toPEM
-import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreServiceTest
-import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreServiceTest.Companion.getPrivateKey
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainOnly
 import io.kotest.matchers.longs.shouldBeGreaterThan
@@ -43,7 +42,6 @@ import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import java.security.KeyPair
 import java.security.cert.X509Certificate
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.ASN1Primitive
@@ -60,19 +58,22 @@ import org.keycloak.representations.IDToken
 
 class SMCBTokenGeneratorTest : ZetaGuardFunSpec() {
   init {
-    val objectUnderTest = SMCBTokenGenerator()
-    val token = objectUnderTest.generateSMCBToken()
-    val (jwt, header) = token.toIDTokenInfo(objectUnderTest.subjectKeyPair.public.createVerifierContext())
+    val objectUnderTest = SMCBTokenGenerator(generateKeyPair())
+    val certificate =
+      buildCertificate(
+        subjectName = DN_PRAXIS, subjectKeyPair = generateKeyPair(), issuerName = DN_GEMATIK, issuerKeyPair = generateKeyPair(), isCA = false)
+    val token = objectUnderTest.generateSMCBToken(nonceString = "noncence", certificateChain = listOf(certificate))
+    val (jwt, header) = token.toIDTokenInfo(objectUnderTest.keys.keypair.public.createVerifierContext())
 
     test("Validate JWT") {
-      val pem = objectUnderTest.certificate.toPEM()
+      val pem = certificate.toPEM()
       pem shouldContain "-----BEGIN CERTIFICATE-----\nMII"
 
       checkJWT(header, jwt)
     }
 
     test("Write publicy key pem") {
-      val pem = objectUnderTest.subjectKeyPair.public.toPEM()
+      val pem = objectUnderTest.keys.publicKeyPEM
       pem shouldContain "-----BEGIN PUBLIC KEY-----\nMFk"
 
       checkJWT(header, jwt)
@@ -83,27 +84,19 @@ class SMCBTokenGeneratorTest : ZetaGuardFunSpec() {
       val subjectName = PrincipalUtil.getSubjectX509Principal(certificate)
       val issuerName = PrincipalUtil.getIssuerX509Principal(certificate)
 
-      certificate shouldBe objectUnderTest.certificate
+      certificate shouldBe certificate
 
-      subjectName shouldBe PrincipalUtil.getSubjectX509Principal(objectUnderTest.certificate)
-      issuerName shouldBe PrincipalUtil.getIssuerX509Principal(objectUnderTest.certificate)
+      subjectName shouldBe PrincipalUtil.getSubjectX509Principal(certificate)
+      issuerName shouldBe PrincipalUtil.getIssuerX509Principal(certificate)
       subjectName shouldBe X509Principal(DN_PRAXIS)
       issuerName shouldBe X509Principal(DN_GEMATIK)
     }
 
-    test("Validate certificate admissions") {
-      val certificate = objectUnderTest.certificate
-      checkCertificateExtensions(certificate, TELEMATIK_ID)
-    }
+    test("Validate certificate admissions") { checkCertificateExtensions(certificate, TELEMATIK_ID) }
 
     test("Validate gematik certificate") {
-      val keystoreService = KeystoreServiceTest.objectUnderTest
-      val privateKey = keystoreService.getPrivateKey(CRT_GEMATIK_LEAF)
-      val leafCertificate = keystoreService.getCertificate(CRT_GEMATIK_LEAF)
-      val publicKey = leafCertificate.publicKey
-      val subjectKeyPair = KeyPair(publicKey, privateKey)
-      val smcbTokenGenerator = SMCBTokenGenerator(subjectKeyPair = subjectKeyPair)
-      val token = smcbTokenGenerator.generateSMCBToken(certificateChain = listOf(leafCertificate))
+      val tokenGenerator = SMCBTokenGenerator(subjectKeyPair = subjectKeyPair)
+      val token = tokenGenerator.generateSMCBToken(nonceString = "noncence", certificateChain = listOf(leafCertificate))
       val (jwt, header) = token.toIDTokenInfo(subjectKeyPair.public.createVerifierContext())
 
       checkJWT(header, jwt)

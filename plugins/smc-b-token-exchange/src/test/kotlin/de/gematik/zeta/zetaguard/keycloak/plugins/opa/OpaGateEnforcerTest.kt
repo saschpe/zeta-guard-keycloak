@@ -29,6 +29,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
+import io.mockk.verify
 import org.apache.http.impl.client.CloseableHttpClient
 import org.jboss.logging.Logger
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -131,6 +132,32 @@ class OpaGateEnforcerTest :
 
           val resOpen = OpaGateEnforcer.enforce(httpClient, input, cfg.copy(failClosed = false), log)
           resOpen.shouldBeInstanceOf<OpaGateEnforcer.Outcome.Allow>()
+        } finally {
+          unmockkObject(OpaDecisionClient)
+        }
+      }
+
+      "simulation is called but does not change outcome" {
+        val httpClient = mockk<CloseableHttpClient>(relaxed = true)
+        val input =
+            OpaGateInput(
+                grantType = "urn:ietf:params:oauth:grant-type:token-exchange",
+                scopes = listOf("s1"),
+                audiences = listOf("aud1"),
+                ipAddress = "127.0.0.1",
+                professionOid = "1.2.3",
+            )
+        mockkObject(OpaDecisionClient)
+        try {
+          // main OPA allows, simulation denies — outcome must still be Allow
+          every { OpaDecisionClient.evaluate(any(), match { it.opaBaseUrl == "http://opa:8181" }, any(), any()) } returns Decision.Allow()
+          every { OpaDecisionClient.evaluate(any(), match { it.opaBaseUrl == "http://opa-simulation:8181" }, any(), any()) } returns Decision.Deny(listOf("sim-reason"))
+
+          val simCfg = cfg.copy(simulationBaseUrl = "http://opa-simulation:8181")
+          val res = OpaGateEnforcer.enforce(httpClient, input, simCfg, log)
+          res.shouldBeInstanceOf<OpaGateEnforcer.Outcome.Allow>()
+          verify(exactly = 1) { OpaDecisionClient.evaluate(any(), match { it.opaBaseUrl == "http://opa:8181" }, any(), any()) }
+          verify(exactly = 1) { OpaDecisionClient.evaluate(any(), match { it.opaBaseUrl == "http://opa-simulation:8181" }, any(), any()) }
         } finally {
           unmockkObject(OpaDecisionClient)
         }

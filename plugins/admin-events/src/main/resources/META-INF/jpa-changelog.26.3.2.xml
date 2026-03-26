@@ -13,7 +13,7 @@
         </preConditions>
 
         <createTable tableName="admin_event_log">
-            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+            <column name="id" type="VARCHAR(36)">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
 

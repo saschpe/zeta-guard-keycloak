@@ -24,15 +24,9 @@
 package de.gematik.zeta.zetaguard.keycloak.commons
 
 import de.gematik.zeta.zetaguard.keycloak.commons.CertificateGenerator.buildCertificate
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_INTERMEDIATE
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_INTERMEDIATE_DN
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF_DN
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF_NAME
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF_ORGANISATION
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_ROOT_DN
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.intermediateCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.leafCertificate
 import de.gematik.zeta.zetaguard.keycloak.commons.server.admission
-import de.gematik.zeta.zetaguard.keycloak.commons.server.betriebsstaetteArzt
 import de.gematik.zeta.zetaguard.keycloak.commons.server.extractExtension
 import de.gematik.zeta.zetaguard.keycloak.commons.server.firstAdmission
 import de.gematik.zeta.zetaguard.keycloak.commons.server.firstProfession
@@ -43,7 +37,6 @@ import de.gematik.zeta.zetaguard.keycloak.commons.server.subjectCommonName
 import de.gematik.zeta.zetaguard.keycloak.commons.server.subjectOrganisationName
 import de.gematik.zeta.zetaguard.keycloak.commons.server.validateCertificateChain
 import de.gematik.zeta.zetaguard.keycloak.commons.server.validateCertificateSignature
-import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreServiceTest
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.collections.shouldContain
@@ -94,49 +87,45 @@ class CertificateGeneratorTest : ZetaGuardFunSpec() {
 
     test("Certificate chain should pass PKIX validation") {
       with(objectUnderTest) {
-        val validatorResult = validateCertificateChain(rootCert, leafCert, intermediateCert).shouldBeRight()
+        val validatorResult = validateCertificateChain(rootCert, listOf(leafCert, intermediateCert)).shouldBeRight()
 
         validatorResult.publicKey shouldBe leafCert.publicKey
       }
     }
 
     test("Just checking intermediate certificate") { //
-      with(objectUnderTest) { validateCertificateChain(intermediateCert, leafCert).shouldBeRight() }
+      with(objectUnderTest) { validateCertificateChain(intermediateCert, listOf(leafCert)).shouldBeRight() }
     }
 
     test("Checking gematik certificates") {
-        val keystoreService = KeystoreServiceTest.objectUnderTest
-        val certificate = keystoreService.getCertificate(CRT_GEMATIK_INTERMEDIATE)
-        val leaf = keystoreService.getCertificate(CRT_GEMATIK_LEAF)
+      leafCertificate.subjectCommonName() shouldBe CRT_GEMATIK_LEAF_NAME
+      leafCertificate.subjectOrganisationName() shouldBe CRT_GEMATIK_LEAF_ORGANISATION
 
-        leaf.subjectCommonName() shouldBe CRT_GEMATIK_LEAF_NAME
-        leaf.subjectOrganisationName() shouldBe CRT_GEMATIK_LEAF_ORGANISATION
+      val professionInfo = leafCertificate.extractExtension<AdmissionSyntax>(admission)?.firstAdmission()?.firstProfessionInfo()!!
+      val professionIdentifier = professionInfo.firstProfession()!!
+      val professionOID = professionIdentifier.id
+      val telematikID = professionInfo.registrationNumber
 
-        val professionInfo = leaf.extractExtension<AdmissionSyntax>(admission)?.firstAdmission()?.firstProfessionInfo()!!
-        val professionIdentifier = professionInfo.firstProfession()!!
-        val professionOID = professionIdentifier.id
-        val telematikID = professionInfo.registrationNumber
+      professionOID shouldBe betriebsstaetteArzt.id
+      telematikID shouldBe TELEMATIK_ID
 
-        professionOID shouldBe betriebsstaetteArzt.id
-        telematikID shouldBe TELEMATIK_ID
-
-        validateCertificateChain(certificate, leaf).shouldBeRight()
+      validateCertificateChain(intermediateCertificate, listOf(leafCertificate)).shouldBeRight()
     }
 
     test("Validating certificate fails") {
       with(objectUnderTest) {
-          val keyPair = generateKeyPair()
-          val unrelatedCertificate = buildCertificate(
-              subjectName = CRT_GEMATIK_ROOT_DN,
-              subjectKeyPair = keyPair,
-              issuerName = CRT_GEMATIK_ROOT_DN,
-              issuerKeyPair = keyPair,
-              isCA = true,
-              isRootCA = true,
-              createAdmissionExtension = false
-          )
+        val keyPair = generateKeyPair()
+        val unrelatedCertificate =
+          buildCertificate(
+            subjectName = CRT_GEMATIK_ROOT_DN,
+            subjectKeyPair = keyPair,
+            issuerName = CRT_GEMATIK_ROOT_DN,
+            issuerKeyPair = keyPair,
+            isCA = true,
+            isRootCA = true,
+            createAdmissionExtension = false)
 
-        validateCertificateChain(unrelatedCertificate, leafCert, intermediateCert).shouldBeLeft() shouldContain "validation failed"
+        validateCertificateChain(unrelatedCertificate, listOf(leafCert, intermediateCert)).shouldBeLeft() shouldContain "validation failed"
       }
     }
 
@@ -205,4 +194,3 @@ class CertificateChain(
       isCA = false,
     )
 }
-

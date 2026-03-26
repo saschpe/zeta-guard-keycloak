@@ -48,11 +48,15 @@ object OpaGateEnforcer {
     if (httpClient == null) return handleHttpClientUnavailable(opaConfig, log)
 
     val payloadJson = buildPayloadJson(opaGateInput)
-    log.infof("**OPA TokenPolicy** payload/input -> %s", payloadJson)
-    log.infof("**OPA TokenPolicy** decision endpoint -> %s%s", opaConfig.opaBaseUrl, opaConfig.decisionPath)
+    log.debugf("🛡 OPA TokenPolicy payload/input -> %s", payloadJson)
+    log.debugf("🛡 OPA TokenPolicy decision endpoint -> %s%s", opaConfig.opaBaseUrl, opaConfig.decisionPath)
 
     val decision = OpaDecisionClient.evaluate(httpClient, opaConfig, payloadJson, log)
-    return mapDecisionToOutcome(decision, opaConfig, log)
+    val outcome = mapDecisionToOutcome(decision, opaConfig, log)
+
+    if (opaConfig.simulationBaseUrl.isNotBlank()) runSimulation(httpClient, opaConfig, payloadJson, log)
+
+    return outcome
   }
 
   private fun policyDenied() = KeycloakError(Errors.ACCESS_DENIED, "policy_denied", Response.Status.FORBIDDEN)
@@ -66,7 +70,7 @@ object OpaGateEnforcer {
   private fun isTokenExchangeGrant(grantType: String?) = TOKEN_EXCHANGE_GRANT_TYPE.equals(grantType, ignoreCase = true)
 
   private fun handleHttpClientUnavailable(opaConfig: OPAConfig, log: Logger): Outcome {
-    log.warnf("**OPA TokenPolicy** HttpClient unavailable; failClosed=%s -> %s", opaConfig.failClosed, if (opaConfig.failClosed) "503" else "ALLOW")
+    log.warnf("🛡 OPA TokenPolicy HttpClient unavailable; failClosed=%s -> %s", opaConfig.failClosed, if (opaConfig.failClosed) "503" else "ALLOW")
     return if (opaConfig.failClosed) Outcome.Error(temporarilyUnavailable()) else Outcome.Allow()
   }
 
@@ -87,7 +91,7 @@ object OpaGateEnforcer {
       when (decision) {
         is Decision.Allow -> {
           log.infof(
-              "**OPA TokenPolicy** decision result=true -> ALLOW (access_ttl=%s, refresh_ttl=%s)",
+              "🛡 OPA TokenPolicy decision result=true -> ALLOW (access_ttl=%s, refresh_ttl=%s)",
               decision.accessTokenTtl,
               decision.refreshTokenTtl,
           )
@@ -96,14 +100,41 @@ object OpaGateEnforcer {
 
         is Decision.Deny -> {
           val reasonsText = formatReasons(decision.reasons)
-          log.infof("**OPA TokenPolicy** decision result=false -> DENY reasons=%s", reasonsText)
+          log.infof("🛡 OPA TokenPolicy decision result=false -> DENY reasons=%s", reasonsText)
           Outcome.Deny(policyDenied())
         }
 
         is Decision.Error -> {
-          log.warnf("**OPA TokenPolicy**: OPA error; failClosed=%s -> %s", opaConfig.failClosed, if (opaConfig.failClosed) "503" else "ALLOW")
+          log.warnf("🛡 OPA TokenPolicy: could not obtain decision; failClosed=%s -> %s", opaConfig.failClosed, if (opaConfig.failClosed) "503" else "ALLOW")
           if (opaConfig.failClosed) Outcome.Error(temporarilyUnavailable()) else Outcome.Allow()
         }
+      }
+
+  private fun runSimulation(httpClient: CloseableHttpClient, opaConfig: OPAConfig, payloadJson: String, log: Logger) {
+    try {
+      val simConfig = opaConfig.copy(opaBaseUrl = opaConfig.simulationBaseUrl)
+      log.debugf("🔮 OPA-Sim TokenPolicy decision endpoint -> %s%s", simConfig.opaBaseUrl, simConfig.decisionPath)
+      val decision = OpaDecisionClient.evaluate(httpClient, simConfig, payloadJson, log)
+      logSimDecision(decision, log)
+    } catch (e: Exception) {
+      log.warnf(e, "🔮 OPA-Sim TokenPolicy unexpected error")
+    }
+  }
+
+  private fun logSimDecision(decision: Decision, log: Logger) =
+      when (decision) {
+        is Decision.Allow ->
+            log.infof(
+                "🔮 OPA-Sim TokenPolicy result=true -> ALLOW (access_ttl=%s, refresh_ttl=%s)",
+                decision.accessTokenTtl,
+                decision.refreshTokenTtl,
+            )
+        is Decision.Deny ->
+            log.infof(
+                "🔮 OPA-Sim TokenPolicy result=false -> DENY reasons=%s",
+                formatReasons(decision.reasons),
+            )
+        is Decision.Error -> log.warnf("🔮 OPA-Sim TokenPolicy error getting decision")
       }
 
   private fun formatReasons(reasons: List<String>) = if (reasons.isEmpty()) "[]" else reasons.joinToString(prefix = "[", postfix = "]")

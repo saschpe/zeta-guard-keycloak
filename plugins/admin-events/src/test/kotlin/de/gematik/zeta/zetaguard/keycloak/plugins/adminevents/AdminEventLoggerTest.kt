@@ -24,8 +24,8 @@
 package de.gematik.zeta.zetaguard.keycloak.plugins.adminevents
 
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLog
-import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_MARKER
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_HASH
+import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_MARKER
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 
@@ -34,12 +34,13 @@ class AdminEventLoggerTest : AbstractAdminEventLoggerTest() {
     context("AdminEventLogger") {
       test("basic persistence") {
         val adminEventLog =
-            AdminEventLog(
-                createdAt = Instant.now(),
-                event = """{"event":"test_event"}""",
-                previousHash = "previousHash123",
-                currentHash = "currentHash123",
-            )
+          AdminEventLog(
+            id = "jens",
+            createdAt = Instant.now(),
+            event = """{"event":"test_event"}""",
+            previousHash = "previousHash123",
+            currentHash = "currentHash123",
+          )
 
         adminEventLogStorageService.saveAdminEventLog(adminEventLog)
         newTransaction()

@@ -1,0 +1,93 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://openvex.dev/docs/public/vex-125d34f0b1208192a6bceafe82c9229daae7d887e8ee04ca5f4812886c19d721",
+  "author": "Unknown Author",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2025-66293"
+      },
+      "products": [
+        {
+          "@id": "pkg:rpm/redhat/java-21-openjdk-headless"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "Wird nicht verwendet. Image-Processing wird nicht genutzt.",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "timestamp": "2026-02-13T12:54:56.395996953Z"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-22184"
+      },
+      "products": [
+        {
+          "@id": "pkg:rpm/redhat/java-21-openjdk-headless"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "untgz ist nicht im Image enthalten und wird außerdem auch nicht verwendet.",
+      "justification": "vulnerable_code_not_present",
+      "timestamp": "2026-02-13T12:54:56.395996953Z"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2025-59250"
+      },
+      "products": [
+        {
+          "@id": "pkg:maven/com.microsoft.sqlserver/mssql-jdbc@13.2.1"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "False positive. Das ist mit Version der hier vorliegenden Version 13.2.1 gefixt. Siehe https://learn.microsoft.com/en-us/sql/connect/jdbc/release-notes-for-the-jdbc-driver?view=sql-server-ver17#132-releases",
+      "justification": "vulnerable_code_not_present",
+      "timestamp": "2026-02-13T12:54:56.395996953Z"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-25646"
+      },
+      "products": [
+        {
+          "@id": "pkg:rpm/redhat/java-21-openjdk-headless"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "Wird nicht verwendet. Image-Processing wird nicht genutzt.",
+      "justification": "vulnerable_code_not_present",
+      "timestamp": "2026-03-13T12:43:30.721754000Z"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-26740"
+      },
+      "products": [
+        {
+          "@id": "pkg:rpm/redhat/java-21-openjdk-headless"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "Wird nicht verwendet. Image-Processing wird nicht genutzt.",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "timestamp": "2026-03-23T10:50:00Z"
+    },
+    {
+      "vulnerability": {
+        "name": "GHSA-72hv-8253-57qq"
+      },
+      "products": [
+        {
+          "@id": "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.19.2"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "Wird von Keycloak verwendet. Allerding wird die verwundbare async Api nicht verwendet. Die verwendete sync Api ist nicht verwundbar.",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "timestamp": "2026-03-17T08:26:52.598916253Z"
+    }
+  ],
+  "timestamp": "2026-03-23T10:50:00Z"
+}

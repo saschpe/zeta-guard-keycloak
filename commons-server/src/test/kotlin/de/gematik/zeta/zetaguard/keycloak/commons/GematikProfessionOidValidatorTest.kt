@@ -23,9 +23,13 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.commons
 
-import de.gematik.zeta.zetaguard.keycloak.commons.server.betriebsstaetteArzt
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import org.bouncycastle.asn1.ASN1ObjectIdentifier
+
+// https://gemspec.gematik.de/downloads/gemSpec/gemSpec_OID/gemSpec_OID_V3.12.3_Aend.html#3.5.1.3
+const val PROFESSION_OID = "1.2.276.0.76.4.50"
+val betriebsstaetteArzt = ASN1ObjectIdentifier(PROFESSION_OID)
 
 class GematikProfessionOidValidatorTest : FunSpec() {
   init {

@@ -24,12 +24,16 @@
 package de.gematik.zeta.zetaguard.keycloak.plugins
 
 import arrow.core.Either
+import arrow.core.Either.Companion.catch
 import arrow.core.raise.either
 import de.gematik.zeta.zetaguard.keycloak.commons.JsonUtil.toObject
+import de.gematik.zeta.zetaguard.keycloak.commons.server.baseUrl
 import de.gematik.zeta.zetaguard.keycloak.commons.server.toCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.server.toJWKS
+import de.gematik.zeta.zetaguard.keycloak.commons.server.toPublicKey
 import de.gematik.zeta.zetaguard.keycloak.commons.toAccessToken
-import de.gematik.zeta.zetaguard.keycloak.plugins.token.KeycloakValidationError
-import de.gematik.zeta.zetaguard.keycloak.plugins.token.ZetaGuardTokenExchangeContext
+import de.gematik.zeta.zetaguard.keycloak.plugins.token_exchange.KeycloakValidationError
+import de.gematik.zeta.zetaguard.keycloak.plugins.token_exchange.ZetaGuardTokenExchangeContext
 import jakarta.ws.rs.core.MultivaluedMap
 import java.security.PublicKey
 import java.security.cert.X509Certificate
@@ -39,55 +43,46 @@ import org.keycloak.TokenVerifier.IS_ACTIVE
 import org.keycloak.crypto.SignatureProvider
 import org.keycloak.jose.jwk.JSONWebKeySet
 import org.keycloak.jose.jwk.JWK
-import org.keycloak.jose.jwk.JWKParser
 import org.keycloak.protocol.oidc.OIDCConfigAttributes.JWKS_STRING
 import org.keycloak.protocol.oidc.TokenManager.TokenRevocationCheck
 import org.keycloak.representations.IDToken
 import org.keycloak.util.TokenUtil
 
-internal fun JWK.toPublicKey(): Either<KeycloakValidationError, PublicKey> = either {
-  Either.catch { JWKParser.create(this@toPublicKey).toPublicKey() }.mapLeft { invalidClientPublicKey("Cannot convert JWK to public key") }.bind()
-}
+internal fun JWK.extractPublicKey(): Either<KeycloakValidationError, PublicKey> =
+  catch { this@extractPublicKey.toPublicKey() }.mapLeft { invalidClientPublicKey("Cannot convert JWK to public key") }
 
-internal fun String.toJWKS(): Either<KeycloakValidationError, JSONWebKeySet> = either {
-  Either.catch { this@toJWKS.toObject<JSONWebKeySet>() }.mapLeft { invalidClientPublicKey("Cannot parse JWKS attribute »$JWKS_STRING«") }.bind()
-}
+internal fun String.convertToJWKS(): Either<KeycloakValidationError, JSONWebKeySet> =
+  catch { this@convertToJWKS.toJWKS() }.mapLeft { invalidClientPublicKey("Cannot parse JWKS attribute »$JWKS_STRING«") }
 
-internal inline fun <reified T> parseClaim(json: Map<String, Any>, claim: String): Either<KeycloakValidationError, T> = either {
-    Either.catch { json.toObject<T>() }
-        .mapLeft {
-            logger.warn("Failed to read $claim", it)
-            invalidClientClaim(it.message ?: "Failed to read $claim")
-        }
-        .bind()
-}
+internal inline fun <reified T> parseClaim(json: Map<String, Any>, claim: String): Either<KeycloakValidationError, T> =
+  catch { json.toObject<T>() }
+    .mapLeft {
+      logger.warn("Failed to read $claim", it)
+      invalidClientClaim(it.message ?: "Failed to read $claim")
+    }
 
-internal fun readCertificate(context: ZetaGuardTokenExchangeContext): Either<KeycloakValidationError, X509Certificate> = either {
-  Either.catch {
+internal fun readCertificate(context: ZetaGuardTokenExchangeContext): Either<KeycloakValidationError, X509Certificate> =
+  catch {
       // leaf certificate is first in chain
-      context.header.x5c[0].toCertificate()
+      context.tokenHeader.x5c[0].toCertificate()
     }
     .mapLeft { invalidToken(it.message ?: "Invalid certificate") }
-    .bind()
-}
 
-internal fun createToken(verifier: TokenVerifier<IDToken>): Either<KeycloakValidationError, IDToken> = either {
-  Either.catch { verifier.verify().getToken() }
+internal fun createToken(verifier: TokenVerifier<IDToken>): Either<KeycloakValidationError, IDToken> =
+  catch { verifier.verify().getToken() }
     .mapLeft {
       logger.warn("Failed to verify identity token", it)
       invalidToken(it.message ?: "Token validation failed")
     }
-    .bind()
-}
 
 internal fun createTokenVerifier(context: ZetaGuardTokenExchangeContext): Either<KeycloakValidationError, TokenVerifier<IDToken>> = either {
   val session = context.context.session
-  val expectedAudiences = session.context.uri.baseUri.toString()
+  val expectedAudiences = session.context.uri.baseUrl()
   val actualAudiences = context.subjectToken.toAccessToken().audience.toList()
 
   logger.debug("Audience check: Expecting »$expectedAudiences«, subject token contains: $actualAudiences")
 
-  Either.catch {
+  catch {
       val verifier =
         TokenVerifier.create(context.subjectToken, IDToken::class.java)
           .withChecks(IS_ACTIVE)
@@ -95,7 +90,7 @@ internal fun createTokenVerifier(context: ZetaGuardTokenExchangeContext): Either
           .audience(expectedAudiences)
           .tokenType(listOf(TokenUtil.TOKEN_TYPE_BEARER, TokenUtil.TOKEN_TYPE_DPOP))
       val key = context.createCertificateKeyWrapper()
-      val signatureProvider = session.getProvider(SignatureProvider::class.java, context.header.algorithm.name)
+      val signatureProvider = session.getProvider(SignatureProvider::class.java, context.tokenHeader.algorithm.name)
       val signatureVerifier = signatureProvider.verifier(key)
 
       verifier.verifierContext(signatureVerifier)
@@ -108,15 +103,15 @@ internal fun createTokenVerifier(context: ZetaGuardTokenExchangeContext): Either
 }
 
 internal fun resolveAudiences(formParams: MultivaluedMap<String, String>, context: ZetaGuardTokenExchangeContext): List<String>? {
-    val audiencesRaw = formParams.getFirst(AUDIENCE)
+  val audiencesRaw = formParams.getFirst(AUDIENCE)
 
-    return if (!audiencesRaw.isNullOrBlank()) {
-        audiencesRaw.split(',', ' ').map { it.trim() }.filter { it.isNotBlank() }.ifEmpty { null }
-    } else {
-        try {
-            context.subjectToken.toAccessToken().audience?.toList()
-        } catch (_: Exception) {
-            null
-        }
+  return if (!audiencesRaw.isNullOrBlank()) {
+    audiencesRaw.split(',', ' ').map { it.trim() }.filter { it.isNotBlank() }.ifEmpty { null }
+  } else {
+    try {
+      context.subjectToken.toAccessToken().audience?.toList()
+    } catch (_: Exception) {
+      null
     }
+  }
 }

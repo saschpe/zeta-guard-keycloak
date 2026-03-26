@@ -48,7 +48,7 @@ class OpaPayloadBuilderTest :
         req["scopes"].shouldBeNull()
       }
 
-      test("audiences blank entries -> aud omitted/null") {
+      test("audiences blank entries -> audience omitted/null") {
         val json =
             OpaPayloadBuilder.build(
                 OpaPayloadBuilder.PayloadParams(
@@ -63,7 +63,26 @@ class OpaPayloadBuilderTest :
             )
         val node = JsonSerialization.mapper.readTree(json)
         val req = node["input"]["authorization_request"]
+        req["audience"].shouldBeNull()
+      }
+
+      test("audiences provided -> only audience is present") {
+        val json =
+            OpaPayloadBuilder.build(
+                OpaPayloadBuilder.PayloadParams(
+                    scopes = listOf("s1"),
+                    audiences = listOf(" audience-1 ", "audience-2"),
+                    grantType = null,
+                    ipAddress = null,
+                    professionOid = null,
+                    productId = null,
+                    productVersion = null,
+                )
+            )
+        val node = JsonSerialization.mapper.readTree(json)
+        val req = node["input"]["authorization_request"]
         req["aud"].shouldBeNull()
+        req["audience"].map { it.asText() } shouldBe listOf("audience-1", "audience-2")
       }
 
       test("professionOid provided -> user_info.professionOID present; blank omitted") {

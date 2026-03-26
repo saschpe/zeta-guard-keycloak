@@ -23,15 +23,8 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.commons
 
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_INTERMEDIATE
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_INTERMEDIATE_DN
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_LEAF_DN
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_ROOT
-import de.gematik.zeta.zetaguard.keycloak.commons.server.CRT_GEMATIK_ROOT_DN
 import de.gematik.zeta.zetaguard.keycloak.commons.server.EC_CURVE_P256
 import de.gematik.zeta.zetaguard.keycloak.commons.server.setupBouncyCastle
-import de.gematik.zeta.zetaguard.keycloak.pkcs12.KEYSTORE_PASSWORD
 import java.io.File
 import java.security.KeyStore
 import org.bouncycastle.jce.provider.BouncyCastleProvider.PROVIDER_NAME
@@ -41,7 +34,7 @@ import org.keycloak.common.util.KeystoreUtil.KeystoreFormat.PKCS12
 fun main(@Suppress("unused") args: Array<String>) {
   setupBouncyCastle()
 
-  val password = if (args.size > 0) args[0] else KEYSTORE_PASSWORD
+  val password = if (args.size > 0) args[0] else SMCB_KEYSTORE_PASSWORD
   val rootCertName = if (args.size > 1) args[1] else CRT_GEMATIK_ROOT
   val intermediateCertName = if (args.size > 2) args[2] else CRT_GEMATIK_INTERMEDIATE
   val leafCertName = if (args.size > 3) args[3] else CRT_GEMATIK_LEAF

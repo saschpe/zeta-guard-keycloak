@@ -25,24 +25,29 @@
 
 package de.gematik.zeta.zetaguard.keycloak.it
 
-import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenGenerator
+import de.gematik.zeta.zetaguard.keycloak.commons.ClientAssertionTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
 import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreService
 import java.security.KeyPair
+import java.security.PrivateKey
+import java.security.PublicKey
 
 private const val ZETA_CLIENT_KS_PASSWORD = "IzMjk+PEE2QjZDMUF"
 
 /**
  * Helper class to generate client_assertion JWT
  *
- * Uses self-created keystore zeta-client.p12, see [de.gematik.zeta.zetaguard.keycloak.commons.KeystoreGenerator]. The client "zeta-client" refers to the certificate in there (see
- * zeta-client.json)
+ * Uses self-created keystore zeta-client.p12 for integration tests, see [de.gematik.zeta.zetaguard.keycloak.commons.KeystoreGenerator].
+ *
+ * The client "zeta-client" is configured to use the same certificate/public key stored in there (see zeta-client.json, field
+ * "jwt.credential.public.key")
  */
 object ClientAssertionTokenHelper {
   private val stream = ClientAssertionTokenHelper::class.java.getResourceAsStream("/zeta-client.p12")!!
   private val keystoreService = KeystoreService(stream, ZETA_CLIENT_KS_PASSWORD)
-  private val privateKey = keystoreService.getPrivateKey(ZETA_CLIENT, ZETA_CLIENT_KS_PASSWORD)
-  private val publicKey = keystoreService.getCertificate(ZETA_CLIENT).publicKey!!
+  private val privateKey: PrivateKey = keystoreService.getPrivateKey(ZETA_CLIENT, ZETA_CLIENT_KS_PASSWORD)
+  private val publicKey: PublicKey = keystoreService.findCertificate(ZETA_CLIENT)!!.publicKey
   private val subjectKeyPair = KeyPair(publicKey, privateKey)
-  val jwsTokenGenerator = SMCBTokenGenerator(subjectKeyPair = subjectKeyPair)
+
+  val clientAssertionTokenGenerator = ClientAssertionTokenGenerator(subjectKeyPair = subjectKeyPair)
 }

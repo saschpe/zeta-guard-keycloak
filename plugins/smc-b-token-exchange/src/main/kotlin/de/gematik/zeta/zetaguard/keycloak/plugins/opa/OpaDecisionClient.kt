@@ -46,7 +46,7 @@ object OpaDecisionClient {
       httpClient.execute(request).use { response ->
         val status = response.statusLine?.statusCode ?: -1
         val dur = System.currentTimeMillis() - start
-        log.infof("**OPA TokenPolicy** OPA status=%d (dur=%dms)", status, dur)
+        log.infof("OPA TokenPolicy status=%d (dur=%dms)", status, dur)
 
         when (status) {
           SC_OK -> {
@@ -56,12 +56,15 @@ object OpaDecisionClient {
             parseDecision(bytes, log)
           }
 
-          in 400..499 -> Decision.Error(null)
-          else -> Decision.Error(null)
+          else -> {
+            val body = response.entity?.content?.use { it.readBytes() }?.let { String(it) } ?: "<no body>"
+            log.warnf("OPA TokenPolicy unexpected HTTP %d response: %s", status, body)
+            Decision.Error(null)
+          }
         }
       }
     } catch (ex: Exception) {
-      log.warn("**OPA TokenPolicy** error calling OPA", ex)
+      log.warn("OPA TokenPolicy error calling OPA", ex)
       Decision.Error(ex)
     }
   }
@@ -81,7 +84,16 @@ object OpaDecisionClient {
 
   private fun parseDecision(bytes: ByteArray, log: Logger): Decision {
     val node = JsonSerialization.mapper.readTree(bytes)
-    val resultNode = node["result"] ?: return Decision.Error(null)
+    val resultNode = node["result"]
+
+    if (resultNode == null) {
+      val decisionId = node["decision_id"]?.asText() ?: "unknown"
+      log.warnf(
+          "OPA TokenPolicy response has no 'result' field (decision_id=%s) — bundle may not be loaded or policy path is wrong",
+          decisionId,
+      )
+      return Decision.Error(null)
+    }
 
     return when {
       resultNode.isObject -> {
@@ -92,26 +104,30 @@ object OpaDecisionClient {
             val ttlNode = resultNode["ttl"]
             val accessTtl = ttlNode?.get("access_token")?.takeIf { it.isInt }?.asInt()
             val refreshTtl = ttlNode?.get("refresh_token")?.takeIf { it.isInt }?.asInt()
-            log.infof("**OPA TokenPolicy** allow=true access_ttl=%s refresh_ttl=%s", accessTtl, refreshTtl)
+            log.infof("OPA TokenPolicy allow=true access_ttl=%s refresh_ttl=%s", accessTtl, refreshTtl)
             Decision.Allow(accessTtl, refreshTtl)
           } else {
             val reasonsNode = resultNode["reasons"]
             val reasonsList = reasonsList(reasonsNode)
-            log.infof("**OPA TokenPolicy** allow=false reasons=%d", reasonsList.size)
+            log.infof("OPA TokenPolicy allow=false reasons=%d", reasonsList.size)
             Decision.Deny(reasonsList)
           }
         } else {
+          log.warnf("OPA TokenPolicy result object has no boolean 'allow' field: %s", resultNode)
           Decision.Error(null)
         }
       }
 
       resultNode.isBoolean -> {
         val allow = resultNode.asBoolean()
-        log.infof("**OPA TokenPolicy** allow=%s", allow)
+        log.debugf("OPA TokenPolicy allow=%s", allow)
         if (allow) Decision.Allow() else Decision.Deny(emptyList())
       }
 
-      else -> Decision.Error(null)
+      else -> {
+        log.warnf("OPA TokenPolicy unexpected result type %s: %s", resultNode.nodeType, resultNode)
+        Decision.Error(null)
+      }
     }
   }
 

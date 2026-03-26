@@ -4,20 +4,21 @@
 
     <groupId>de.gematik.zeta.zeta-guard</groupId>
     <artifactId>keycloak-zeta</artifactId>
-    <version>0.3.2</version>
+    <version>0.4.1</version>
     <packaging>pom</packaging>
 
     <name>𝝵-Guard :: Create ZETA-Guard Keycloak</name>
     <description>Collection of Keycloak plugins and extensions for 𝝵-Guard</description>
 
     <properties>
-        <kotlin.version>2.2.21</kotlin.version>
+        <kotlin.version>2.3.20</kotlin.version>
         <arrow.version>2.1.2</arrow.version>
-        <keycloak.version>999.0.0-SNAPSHOT</keycloak.version>
+        <keycloak.version>26.5.6</keycloak.version>
         <quarkus.version>3.30.5</quarkus.version>
         <keycloak.admin.version>26.0.7</keycloak.admin.version>
         <resteasy.version>6.2.12.Final</resteasy.version>
-        <bouncycastle.version>1.81</bouncycastle.version>
+        <bouncycastle.version>1.82</bouncycastle.version>
+        <bytebuddy.version>1.17.6</bytebuddy.version>
         <jacoco.version>0.8.14</jacoco.version>
         <java.version>21</java.version>
 
@@ -85,6 +86,13 @@
             </dependency>
 
             <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>${bytebuddy.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcpkix-debug-jdk18on</artifactId>
                 <version>${bouncycastle.version}</version>
@@ -138,6 +146,18 @@
                 <groupId>io.arrow-kt</groupId>
                 <artifactId>arrow-atomic-jvm</artifactId>
                 <version>${arrow.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.microsoft.azure</groupId>
+                <artifactId>TSS.Java</artifactId>
+                <version>1.0.0</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <dependency>
@@ -302,12 +322,6 @@
 
             <dependency>
                 <groupId>de.gematik.zeta.zeta-guard</groupId>
-                <artifactId>client-assertion</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>de.gematik.zeta.zeta-guard</groupId>
                 <artifactId>admin-events</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -465,6 +479,12 @@
                     <artifactId>sonar-maven-plugin</artifactId>
                     <version>5.2.0.4988</version>
                 </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.5</version>
+                </plugin>
             </plugins>
         </pluginManagement>
 
@@ -541,10 +561,11 @@
 
                 <executions>
                     <execution>
+                        <id>spotless</id>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>apply</goal>
                         </goals>
-                        <phase>generate-sources</phase>
                     </execution>
                 </executions>
             </plugin>
@@ -569,6 +590,7 @@
 
                 <executions>
                     <execution>
+                        <id>surefire-report</id>
                         <phase>test</phase>
 
                         <goals>
@@ -585,6 +607,8 @@
 
                 <executions>
                     <execution>
+                        <id>add test jar</id>
+
                         <goals>
                             <goal>test-jar</goal>
                         </goals>
@@ -619,9 +643,8 @@
         <module>plugins/nonce-management</module>
         <module>plugins/client-registration</module>
         <module>plugins/access-token-mapper</module>
-        <module>plugins/well-known</module>
+        <module>plugins/well-known-provider</module>
         <module>docker-keycloak</module>
-        <module>client-assertion</module>
     </modules>
 
     <profiles>
@@ -635,6 +658,8 @@
                         <artifactId>cyclonedx-maven-plugin</artifactId>
                         <executions>
                             <execution>
+                                <id>cyclonedx</id>
+
                                 <phase>package</phase>
                                 <goals>
                                     <goal>makeAggregateBom</goal>

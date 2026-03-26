@@ -116,8 +116,7 @@ class ZetaGuardClientRegistrationPolicyFactory : ClientRegistrationPolicyFactory
             .filter { it.getAttribute(ATTRIBUTE_ATTESTATION_STATE) == ATTESTATION_STATE_PENDING }
             .filter {
               val createdAtString =
-                it.getAttribute(ATTRIBUTE_CREATED_AT)
-                  ?: throw IllegalStateException("Missing client attribute $ATTRIBUTE_CREATED_AT for client ${it.clientId}")
+                it.getAttribute(ATTRIBUTE_CREATED_AT) ?: error("Missing client attribute $ATTRIBUTE_CREATED_AT for client ${it.clientId}")
               val createdAt = createdAtString.toLocalDateTime()
               val expiresAt = createdAt.plus(timeToLive)
 

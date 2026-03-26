@@ -23,13 +23,12 @@
  */
 package de.gematik.zeta.zetaguard.keycloak.it
 
-import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
-import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
+import de.gematik.zeta.zetaguard.keycloak.commons.CLIENT_B_SCOPE
+import de.gematik.zeta.zetaguard.keycloak.commons.DPoPTokenGenerator.generateDPoPToken
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.leafCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.smcbTokenGenerator
 import de.gematik.zeta.zetaguard.keycloak.commons.server.KeycloakError
-import de.gematik.zeta.zetaguard.keycloak.commons.server.generatePKIData
-import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.leafCertificate
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
+import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.clientAssertionTokenGenerator
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.core.spec.Order
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -43,38 +42,34 @@ import org.keycloak.OAuth2Constants.JWT_TOKEN_TYPE
  * See docker-compose-it.yml.
  */
 @Order(10)
-class XXSMCBUserMaxClientsIT : ZetaGuardFunSpec() {
+class XXSMCBUserMaxClientsIT : ZetaGuardFunSpecIT() {
   init {
-    val keycloakWebClient = KeycloakWebClient()
-    val baseUri = keycloakWebClient.uriBuilder().build().toString()
-    val audiences = if (keycloakWebClient.path.isNotEmpty() && !baseUri.endsWith("/")) listOf("$baseUri/") else listOf(baseUri)
-
     test("Maximum number of clients per user") {
       var i = 0
       var error: KeycloakError? = null
 
       while (i <= 20 && error == null) { // Should fail eventually, see docker-compose-it.yml
-        val oidcClientResponse1 = keycloakWebClient.createClientOIDC(jwsTokenGenerator.keys.jwks).shouldBeRight().reponseObject
-        val nonce1 = keycloakWebClient.getNonce().shouldBeRight().reponseObject
-        val smbcToken1 =
+        val oidcClientResponse1 = keycloakWebClient.createClientOIDC(clientAssertionTokenGenerator.keys.jwks).shouldBeRight().reponseObject
+        val nonce = createNonce()
+        val smbcToken =
           smcbTokenGenerator.generateSMCBToken(
-            nonceString = nonce1,
-            audiences = audiences,
+            nonceString = nonce,
+            audiences = smcbTokenAudience,
             issuer = oidcClientResponse1.clientId,
             issuedFor = oidcClientResponse1.clientId,
             certificateChain = listOf(leafCertificate),
           )
-        val jws1 = jwsTokenGenerator.generateClientAssertion(oidcClientResponse1, nonce1)
-        val keys = generatePKIData()
-        val dPoPToken = smcbTokenGenerator.generateDPoPToken(keys, endpointURL = keycloakWebClient.uriBuilder().tokenUrl(), accessToken = smbcToken1)
+        val jws = clientAssertionTokenGenerator.generateClientAssertion(oidcClientResponse1, nonce)
+        val dPoPToken = generateDPoPToken(endpointURL = keycloakWebClient.uriBuilder().tokenUrl(), accessToken = smbcToken)
 
         keycloakWebClient
           .tokenExchange(
             clientId = oidcClientResponse1.clientId,
-            subjectToken = smbcToken1,
+            subjectToken = smbcToken,
             subjectTokenType = JWT_TOKEN_TYPE,
+            requestedClientScope = CLIENT_B_SCOPE,
             clientAssertionType = CLIENT_ASSERTION_TYPE_JWT,
-            clientAssertion = jws1,
+            clientAssertion = jws,
             dPoPToken = dPoPToken,
           )
           .onLeft { error = it }

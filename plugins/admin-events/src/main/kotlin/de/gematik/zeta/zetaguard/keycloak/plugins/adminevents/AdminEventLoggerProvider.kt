@@ -29,6 +29,7 @@ import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEvent
 import de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage.AdminEventLogStorageService.Companion.GENESIS_MARKER
 import java.time.Instant
 import org.jboss.logging.Logger
+import org.keycloak.common.util.SecretGenerator
 import org.keycloak.events.Event
 import org.keycloak.events.EventListenerProvider
 import org.keycloak.events.admin.AdminEvent
@@ -64,7 +65,12 @@ class AdminEventLoggerProvider(private val adminEventLogService: AdminEventLogSt
     val savedPreviousHash = if (GENESIS_HASH == previousHash) GENESIS_MARKER else previousHash
 
     adminEventLogService.saveAdminEventLog(
-      AdminEventLog(event = json, createdAt = createdAt, previousHash = savedPreviousHash, currentHash = currentHash))
+      AdminEventLog(
+        id = SecretGenerator.getInstance().generateSecureID(),
+        event = json,
+        createdAt = createdAt,
+        previousHash = savedPreviousHash,
+        currentHash = currentHash))
   }
 
   override fun onEvent(event: Event) {

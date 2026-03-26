@@ -24,6 +24,7 @@
 package de.gematik.zeta.zetaguard.keycloak.plugins.adminevents.storage
 
 import de.gematik.zeta.zetaguard.keycloak.commons.server.ENV_GENESIS_HASH
+import de.gematik.zeta.zetaguard.keycloak.commons.server.safeGetenv
 import jakarta.persistence.EntityManager
 import org.keycloak.connections.jpa.JpaConnectionProvider
 import org.keycloak.models.KeycloakSession
@@ -73,10 +74,8 @@ class AdminEventLogStorageService(emCreator: EntityManagerCreator) {
 
   companion object {
     const val GENESIS_MARKER = ENV_GENESIS_HASH
-    val GENESIS_HASH: String by lazy {
-        System.getenv(ENV_GENESIS_HASH)
-            ?: throw IllegalStateException("Environment variable »$ENV_GENESIS_HASH« not set")
-    }
+
+    val GENESIS_HASH: String by lazy { safeGetenv(ENV_GENESIS_HASH) }
   }
 }
 

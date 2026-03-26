@@ -24,12 +24,9 @@
 package de.gematik.zeta.zetaguard.keycloak.it
 
 import de.gematik.zeta.zetaguard.keycloak.commons.CLIENT_B_SCOPE
-import de.gematik.zeta.zetaguard.keycloak.commons.KeycloakWebClient
-import de.gematik.zeta.zetaguard.keycloak.commons.ZetaGuardFunSpec
-import de.gematik.zeta.zetaguard.keycloak.commons.server.ZETA_CLIENT
-import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.jwsTokenGenerator
-import de.gematik.zeta.zetaguard.keycloak.it.SMCBTokenHelper.smcbTokenGenerator
-import io.kotest.assertions.arrow.core.shouldBeRight
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper
+import de.gematik.zeta.zetaguard.keycloak.commons.SMCBTokenHelper.smcbTokenGenerator
+import de.gematik.zeta.zetaguard.keycloak.it.ClientAssertionTokenHelper.clientAssertionTokenGenerator
 import io.kotest.core.spec.Order
 import io.kotest.matchers.shouldBe
 import java.net.URI
@@ -42,39 +39,36 @@ import org.apache.http.entity.ContentType.APPLICATION_JSON
 private const val POLICY_DENIED = "policy_denied"
 
 @Order(2)
-class OpaEnforcementIT : ZetaGuardFunSpec() {
-  private val keycloak = KeycloakWebClient()
-  private val realmUrl = keycloak.uriBuilder().realmUrl().toString()
-
+class OpaEnforcementIT : ZetaGuardFunSpecIT() {
   private val http: HttpClient = HttpClient.newHttpClient()
   private val opaBase = "http://localhost:18181"
 
   init {
     test("OPA allow: permitted scope and audience") {
-      val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-      val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+      val nonce = createNonce()
+      val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
       val smcb =
         smcbTokenGenerator.generateSMCBToken(
           nonceString = nonce,
-          audiences = listOf(keycloak.uriBuilder().build().toString()),
+          audiences = smcbTokenAudience,
           certificateChain = listOf(SMCBTokenHelper.leafCertificate),
         )
 
-      keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true)
+      keycloakWebClient.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE)
     }
 
     test("OPA deny: scopes not allowed") {
       withOpaValue("/v1/data/token/allowed_scopes", "[\"only-other-scope\"]") {
-        val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+        val nonce = createNonce()
+        val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
         val smcb =
           smcbTokenGenerator.generateSMCBToken(
             nonceString = nonce,
-            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            audiences = smcbTokenAudience,
             certificateChain = listOf(SMCBTokenHelper.leafCertificate),
           )
 
-        keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
+        keycloakWebClient.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE) {
           it.statusCode shouldBe 403
           it.error shouldBe org.keycloak.events.Errors.ACCESS_DENIED
           it.errorDescription shouldBe POLICY_DENIED
@@ -84,16 +78,16 @@ class OpaEnforcementIT : ZetaGuardFunSpec() {
 
     test("OPA deny: audience not allowed") {
       withOpaValue("/v1/data/audiences/allowed_audiences", "[\"https://example.com/only\"]") {
-        val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+        val nonce = createNonce()
+        val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
         val smcb =
           smcbTokenGenerator.generateSMCBToken(
             nonceString = nonce,
-            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            audiences = smcbTokenAudience,
             certificateChain = listOf(SMCBTokenHelper.leafCertificate),
           )
 
-        keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
+        keycloakWebClient.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE) {
           it.statusCode shouldBe 403
           it.error shouldBe org.keycloak.events.Errors.ACCESS_DENIED
           it.errorDescription shouldBe POLICY_DENIED
@@ -103,16 +97,16 @@ class OpaEnforcementIT : ZetaGuardFunSpec() {
 
     test("OPA deny: profession not allowed") {
       withOpaValue("/v1/data/professions/allowed_professions", "[]") {
-        val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+        val nonce = createNonce()
+        val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
         val smcb =
           smcbTokenGenerator.generateSMCBToken(
             nonceString = nonce,
-            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            audiences = smcbTokenAudience,
             certificateChain = listOf(SMCBTokenHelper.leafCertificate),
           )
 
-        keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
+        keycloakWebClient.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE) {
           it.statusCode shouldBe 403
           it.error shouldBe org.keycloak.events.Errors.ACCESS_DENIED
           it.errorDescription shouldBe POLICY_DENIED
@@ -122,16 +116,16 @@ class OpaEnforcementIT : ZetaGuardFunSpec() {
 
     test("OPA deny: product posture not allowed") {
       withOpaValue("/v1/data/products/allowed_products", "{}") {
-        val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+        val nonce = createNonce()
+        val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
         val smcb =
           smcbTokenGenerator.generateSMCBToken(
             nonceString = nonce,
-            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            audiences = smcbTokenAudience,
             certificateChain = listOf(SMCBTokenHelper.leafCertificate),
           )
 
-        keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
+        keycloakWebClient.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE) {
           it.statusCode shouldBe 403
           it.error shouldBe org.keycloak.events.Errors.ACCESS_DENIED
           it.errorDescription shouldBe POLICY_DENIED
@@ -142,32 +136,32 @@ class OpaEnforcementIT : ZetaGuardFunSpec() {
     test("OPA allow: profession explicitly allowed") {
       // Allow only the SMCB profession OID used in the test certificate
       withOpaValue("/v1/data/professions/allowed_professions", "[\"1.2.276.0.76.4.50\"]") {
-        val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+        val nonce = createNonce()
+        val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
         val smcb =
           smcbTokenGenerator.generateSMCBToken(
             nonceString = nonce,
-            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            audiences = smcbTokenAudience,
             certificateChain = listOf(SMCBTokenHelper.leafCertificate),
           )
 
-        keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true)
+        keycloakWebClient.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE)
       }
     }
 
     test("OPA deny: profession mismatch (different allowed OID)") {
       // Set an allowed profession OID that does not match the certificate's profession OID
       withOpaValue("/v1/data/professions/allowed_professions", "[\"1.2.276.0.76.4.51\"]") {
-        val nonce = keycloak.getNonce().shouldBeRight().reponseObject
-        val jwt = jwsTokenGenerator.generateClientAssertion(ZETA_CLIENT, listOf(realmUrl), nonce)
+        val nonce = createNonce()
+        val jwt = clientAssertionTokenGenerator.generateClientAssertion(audiences = listOf(clientAssertionAudience), nonceString = nonce)
         val smcb =
           smcbTokenGenerator.generateSMCBToken(
             nonceString = nonce,
-            audiences = listOf(keycloak.uriBuilder().build().toString()),
+            audiences = smcbTokenAudience,
             certificateChain = listOf(SMCBTokenHelper.leafCertificate),
           )
 
-        keycloak.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE, useDPoP = true) {
+        keycloakWebClient.testExchangeToken(subjectToken = smcb, clientAssertion = jwt, requestedClientScope = CLIENT_B_SCOPE) {
           it.statusCode shouldBe 403
           it.error shouldBe org.keycloak.events.Errors.ACCESS_DENIED
           it.errorDescription shouldBe POLICY_DENIED

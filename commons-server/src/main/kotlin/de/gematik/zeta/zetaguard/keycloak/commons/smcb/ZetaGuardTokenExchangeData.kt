@@ -32,12 +32,13 @@ import java.time.Duration
  * Used, e.g., to generate access and refresh tokens
  */
 data class ZetaGuardTokenExchangeData
-@ConstructorProperties("telematikID", "professionOID", "subjectOrganisation", "subjectName", "accessTokenTTL", "refreshTokenTTL")
+@ConstructorProperties("telematikID", "professionOID", "subjectOrganisation", "subjectCommonName", "clientIP", "accessTokenTTL", "refreshTokenTTL")
 constructor(
-    val telematikID: String,
-    val professionOID: String,
-    val subjectOrganisation: String,
-    val subjectName: String,
-    val accessTokenTTL: Duration,
-    val refreshTokenTTL: Duration,
+  val telematikID: String,
+  val professionOID: String,
+  val subjectOrganisation: String,
+  val subjectCommonName: String,
+  val clientIP: String,
+  val accessTokenTTL: Duration,
+  val refreshTokenTTL: Duration
 )

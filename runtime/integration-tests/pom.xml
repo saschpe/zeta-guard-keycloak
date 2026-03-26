@@ -5,7 +5,7 @@
     <parent>
         <groupId>de.gematik.zeta.zeta-guard</groupId>
         <artifactId>keycloak-zeta</artifactId>
-        <version>0.3.2</version>
+        <version>0.4.1</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
@@ -17,6 +17,7 @@
 
     <properties>
         <jacoco.args/>
+        <profiling.args/>
         <jacoco.exec>jacoco-keycloak.exec</jacoco.exec>
     </properties>
 
@@ -169,12 +170,12 @@
             <scope>compile</scope>
         </dependency>
 
-<!--        <dependency>-->
-<!--            <groupId>io.quarkus</groupId>-->
-<!--            <artifactId>quarkus-core-deployment</artifactId>-->
-<!--            <version>${quarkus.version}</version>-->
-<!--            <scope>compile</scope>-->
-<!--        </dependency>-->
+        <!--        <dependency>-->
+        <!--            <groupId>io.quarkus</groupId>-->
+        <!--            <artifactId>quarkus-core-deployment</artifactId>-->
+        <!--            <version>${quarkus.version}</version>-->
+        <!--            <scope>compile</scope>-->
+        <!--        </dependency>-->
     </dependencies>
 
     <build>
@@ -243,8 +244,10 @@
                         <configuration>
                             <environmentVariables>
                                 <!-- See docker-compose-it.yml: Empty by default, activated by coverage profile -->
+                                <PROFILING_OPTS>${profiling.args}</PROFILING_OPTS>
                                 <COVERAGE_OPTS>${jacoco.args}</COVERAGE_OPTS>
                                 <GENESIS_HASH>4841c2142fef441daa6ee6c57db65c011935964b14e94a6c8f5ec0447b83526c</GENESIS_HASH>
+                                <SMCB_HASHING_PEPPER>085c1245-dc0d-4d39-95b4-97496bec6182</SMCB_HASHING_PEPPER>
                             </environmentVariables>
                         </configuration>
 
@@ -263,6 +266,7 @@
 
                 <executions>
                     <execution>
+                        <id>surefire-report</id>
                         <phase>post-integration-test</phase>
 
                         <goals>
@@ -281,6 +285,15 @@
             <properties>
                 <!-- See docker-compose-it.yml: Content of COVERAGE_OPTS environment variable -->
                 <jacoco.args>-javaagent:/opt/keycloak/bin/jacoco-agent.jar=destfile=/opt/keycloak/data/${jacoco.exec}</jacoco.args>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>profiling</id>
+
+            <properties>
+                <!-- See docker-compose-it.yml: Content of COVERAGE_OPTS environment variable -->
+                <jacoco.args>-agentpath:/opt/keycloak/async-profiler/lib/libasyncProfiler.so=start,interval=5ms,jfr,event=cpu,file=/opt/keycloak/data/zeta-guard.jfr</jacoco.args>
             </properties>
         </profile>
     </profiles>

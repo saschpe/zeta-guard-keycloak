@@ -30,18 +30,50 @@ import de.gematik.zeta.zetaguard.keycloak.client_assertion.ClientStatementData
 import de.gematik.zeta.zetaguard.keycloak.client_assertion.Platform
 import de.gematik.zeta.zetaguard.keycloak.client_assertion.PostureType
 import de.gematik.zeta.zetaguard.keycloak.client_assertion.SoftwarePosture
-import de.gematik.zeta.zetaguard.keycloak.client_attestation.AttestationUtil.calculateAttestationChallenge
+import de.gematik.zeta.zetaguard.keycloak.client_assertion.TPMPosture
+import de.gematik.zeta.zetaguard.keycloak.client_attestation.deserializeQuote
+import de.gematik.zeta.zetaguard.keycloak.client_attestation.validateQuoteSignature
 import de.gematik.zeta.zetaguard.keycloak.commons.server.fromBase64
-import de.gematik.zeta.zetaguard.keycloak.commons.server.toThumbprint
-import de.gematik.zeta.zetaguard.keycloak.plugins.token.KeycloakValidationError
-import de.gematik.zeta.zetaguard.keycloak.plugins.token.ZetaGuardTokenExchangeContext
+import de.gematik.zeta.zetaguard.keycloak.commons.server.toCertificate
+import de.gematik.zeta.zetaguard.keycloak.commons.server.toPublicKey
+import de.gematik.zeta.zetaguard.keycloak.commons.server.validateCertificateChain
+import de.gematik.zeta.zetaguard.keycloak.pkcs12.KeystoreService
+import de.gematik.zeta.zetaguard.keycloak.plugins.token_exchange.KeycloakValidationError
+import de.gematik.zeta.zetaguard.keycloak.plugins.token_exchange.ZetaGuardTokenExchangeContext
+
+private const val ATTESTATION_CHALLENGE_DOES_NOT_MATCH = "Attestation challenge does not match"
 
 internal fun checkSoftwarePosture(context: ZetaGuardTokenExchangeContext, posture: SoftwarePosture): Either<KeycloakValidationError, Unit> = either {
-  val nonceBytes = context.token.nonce.fromBase64()
-  val jwkThumbPrint = context.clientJWK.toThumbprint()
-  val attestationChallenge = calculateAttestationChallenge(jwkThumbPrint, nonceBytes)
+  val postureKey = posture.publicKey.toPublicKey().mapLeft { invalidClientAttestation(it) }.bind()
+  val clientKey = context.clientJWK.toPublicKey()
+  val expectedAttestationChallenge = context.attestationChallenge.fromBase64()
+  val attestationChallenge = posture.attestationChallenge.fromBase64()
 
-  ensure(attestationChallenge == posture.attestationChallenge) { invalidClientAttestation("Attestation challenge does not match") }
+  ensure(clientKey == postureKey) { invalidClientAttestation("Public keys from posture and client do not match") }
+  ensure(expectedAttestationChallenge.contentEquals(attestationChallenge)) { invalidClientAttestation(ATTESTATION_CHALLENGE_DOES_NOT_MATCH) }
+}
+
+internal fun checkTPMPosture(
+  context: ZetaGuardTokenExchangeContext,
+  keystoreService: KeystoreService,
+  posture: TPMPosture
+): Either<KeycloakValidationError, Unit> = either {
+  val tpmQuoteBytes = posture.tpmQuote.fromBase64()
+  val tpmQuote = tpmQuoteBytes.deserializeQuote().mapLeft { invalidTPMQuote(it) }.bind()
+  val tpmPublicKey = posture.tpmAttestationKey.toPublicKey().mapLeft { invalidClientAttestation(it) }.bind()
+  val quoteSignature = posture.tpmQuoteSignature.fromBase64()
+  val certificateChain = posture.tpmEkCertificateChain.map { it.toCertificate() }
+  val expectedAttestationChallenge = context.attestationChallenge.fromBase64()
+
+  ensure(certificateChain.isNotEmpty()) { invalidClientAttestation("TPM certificate chain is empty") }
+
+  // TODO: missing attribute attestationChain in specification
+  // https://ey-fp-dev.atlassian.net/browse/ZETAP-905
+  //  ensure(certificateChain[0].publicKey == tpmPublicKey) { invalidClientAttestation("Public keys from attestation and certificate do not match") }
+  ensure(expectedAttestationChallenge.contentEquals(tpmQuote.extraData)) { invalidClientAttestation(ATTESTATION_CHALLENGE_DOES_NOT_MATCH) }
+
+  tpmQuoteBytes.validateQuoteSignature(quoteSignature, tpmPublicKey).mapLeft { invalidTPMQuote(it) }.bind()
+  validateCertificateChain(keystoreService, certificateChain).mapLeft { invalidTpmCertificate(it) }.bind()
 }
 
 internal fun checkPostureType(clientStatementData: ClientStatementData): Either<KeycloakValidationError, Unit> = either {

@@ -33,6 +33,7 @@ object OpaConfigResolver {
   fun normalize(config: OPAConfig): OPAConfig =
       config.copy(
           opaBaseUrl = config.opaBaseUrl.trimEnd('/'),
+          simulationBaseUrl = config.simulationBaseUrl.trimEnd('/'),
           decisionPath = if (config.decisionPath.startsWith("/")) config.decisionPath else "/${config.decisionPath}",
       )
 
@@ -54,16 +55,18 @@ object OpaConfigResolver {
             connectionTimeoutMs = getInt("connection-timeout-ms", base.connectionTimeoutMs),
             readTimeoutMs = getInt("read-timeout-ms", base.readTimeoutMs),
             failClosed = getBool("fail-closed", base.failClosed),
+            simulationBaseUrl = getString("opa-simulation-base-url", base.simulationBaseUrl),
         )
 
     log.infof(
-        "OPAConfig resolved (FQ-root): enabled=%s, baseUrl=%s, decisionPath=%s, connectionTimeoutMs=%d, readTimeoutMs=%d, failClosed=%s",
+        "OPAConfig resolved (FQ-root): enabled=%s, baseUrl=%s, decisionPath=%s, connectionTimeoutMs=%d, readTimeoutMs=%d, failClosed=%s, simulationBaseUrl=%s",
         resolved.enabled,
         resolved.opaBaseUrl,
         resolved.decisionPath,
         resolved.connectionTimeoutMs,
         resolved.readTimeoutMs,
         resolved.failClosed,
+        resolved.simulationBaseUrl,
     )
 
     return resolved
